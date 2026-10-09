@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FATFIGHT · 游戏图鉴</title>
+<style>
+  :root{
+    --bg:#0d0717;
+    --panel:#1a1126;
+    --panel2:#241a33;
+    --gold:#ffd75e;
+    --gold-dim:#b8912f;
+    --parch:#f3e2b3;
+    --ink:#2b1d0f;
+    --blood:#a3302a;
+    --text:#e8dcf5;
+    --muted:#9c8fb3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -100px, rgba(255,215,94,.07), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+    padding:40px 20px 60px;
+    image-rendering:pixelated;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+
+  /* 页头 */
+  header{
+    text-align:center;
+    border:3px solid var(--gold);
+    background:var(--panel);
+    padding:34px 20px 26px;
+    position:relative;
+    margin-bottom:42px;
+    box-shadow:0 0 0 4px var(--bg), 0 0 0 7px var(--gold-dim), 0 10px 0 rgba(0,0,0,.35);
+  }
+  header h1{
+    color:var(--gold);
+    font-size:34px;
+    letter-spacing:10px;
+    text-shadow:3px 3px 0 var(--blood), 6px 6px 0 rgba(0,0,0,.55);
+    margin-bottom:10px;
+  }
+  header p{color:var(--muted);font-size:13px;letter-spacing:2px;}
+  header .corner{position:absolute;width:14px;height:14px;background:var(--gold);}
+  header .c1{top:-3px;left:-3px;} header .c2{top:-3px;right:-3px;}
+  header .c3{bottom:-3px;left:-3px;} header .c4{bottom:-3px;right:-3px;}
+
+  /* 分类标题 */
+  .cat{
+    display:flex;align-items:center;gap:14px;
+    margin:44px 0 20px;
+  }
+  .cat .icon{
+    width:34px;height:34px;
+    background:var(--panel2);
+    border:2px solid var(--gold-dim);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;color:var(--gold);
+  }
+  .cat h2{
+    color:var(--gold);
+    font-size:22px;letter-spacing:6px;
+    text-shadow:2px 2px 0 var(--blood);
+  }
+  .cat .line{flex:1;height:3px;background:linear-gradient(90deg,var(--gold-dim),transparent);}
+
+  /* 卡片网格 */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+    gap:20px;
+  }
+  .card{
+    background:var(--panel);
+    border:2px solid #3a2c55;
+    padding:16px 14px 14px;
+    text-align:center;
+    transition:transform .12s ease, border-color .12s ease;
+    position:relative;
+  }
+  .card:hover{transform:translateY(-4px);border-color:var(--gold-dim);}
+  .card .imgbox{
+    width:100%;height:150px;
+    background:var(--parch);
+    border:2px solid var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:12px;
+    overflow:hidden;
+    box-shadow:inset 0 0 0 3px #d9c497, inset 0 0 18px rgba(43,29,15,.35);
+  }
+  .card .imgbox img{display:block;}
+  .card h3{
+    color:var(--gold);
+    font-size:17px;letter-spacing:2px;
+    margin-bottom:6px;
+  }
+  .card .en{color:var(--muted);font-size:11px;letter-spacing:1px;margin-bottom:8px;}
+  .card p{color:var(--text);font-size:12.5px;line-height:1.7;text-align:left;}
+  .card .tag{
+    position:absolute;top:10px;right:10px;
+    font-size:10px;letter-spacing:1px;
+    padding:2px 7px;color:var(--parch);background:var(--blood);
+    border:1px solid var(--ink);
+  }
+
+  footer{
+    margin-top:50px;text-align:center;color:var(--muted);
+    font-size:12px;letter-spacing:1px;line-height:2;
+  }
+  footer b{color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+    <h1>FATFIGHT 游戏图鉴</h1>
+    <p>中世纪像素风 · 深紫夜幕 × 金色圣辉 · 角色 / 怪物 / 障碍 / 奖励 全收录</p>
+  </header>
+
+  <!-- ============ 主角 ============ -->
+  <div class="cat">
+    <div class="icon">◆</div>
+    <h2>主 角</h2>
+    <div class="line"></div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">玩家</span>
+      <div class="imgbox"><img src="assets/gallery/01_knight.png" alt="燃灯骑士"></div>
+      <h3>燃灯骑士</h3>
+      <div class="en">Knight</div>
+      <p>绿甲骑士是玩家唯一操控的角色：A/D 左右移动、W/空格跳跃、空格二段跳、S 下蹲。基础 5 点生命，吃红心可超上限至 10 点，是整场冒险的全部依仗。</p>
+    </div>
+  </div>
+
+  <!-- ============ 怪物 ============ -->
+  <div class="cat">
+    <div class="icon">☠</div>
+    <h2>怪 物</h2>
+    <div class="line"></div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">跳跃型</span>
+      <div class="imgbox"><img src="assets/gallery/02_slime.png" alt="史莱姆"></div>
+      <h3>史莱姆</h3>
+      <div class="en">Slime</div>
+      <p>最常见的地面敌人，沿着地面有节奏地跳跃逼近。个头不大但会贴身追击，玩家需要卡准间隙跳过。</p>
+    </div>
+    <div class="card">
+      <span class="tag">跳跃型</span>
+      <div class="imgbox"><img src="assets/gallery/04_goblin.png" alt="哥布林"></div>
+      <h3>哥布林</h3>
+      <div class="en">Goblin</div>
+      <p>身形矮小的跳跃型小怪，节奏比史莱姆更快、更考验反应。一旦被碰到就会损失生命值。</p>
+    </div>
+    <div class="card">
+      <span class="tag">大型</span>
+      <div class="imgbox"><img src="assets/gallery/03_big.png" alt="巨兽"></div>
+      <h3>巨兽</h3>
+      <div class="en">Big</div>
+      <p>体积巨大的重型怪物，普通跳跃无法越过，必须用二段跳才能从它头顶安全飞渡。</p>
+    </div>
+    <div class="card">
+      <span class="tag">飞行型</span>
+      <div class="imgbox"><img src="assets/gallery/05_bat.png" alt="蝙蝠"></div>
+      <h3>蝙蝠</h3>
+      <div class="en">Bat</div>
+      <p>盘旋在低空的飞行敌人，跳跃反而容易撞上，正确的应对方式是及时下蹲闪避。</p>
+    </div>
+  </div>
+
+  <!-- ============ 障碍 ============ -->
+  <div class="cat">
+    <div class="icon">▲</div>
+    <h2>障 碍</h2>
+    <div class="line"></div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">地面</span>
+      <div class="imgbox"><img src="assets/gallery/06_spike.png" alt="尖刺"></div>
+      <h3>尖刺</h3>
+      <div class="en">Spike</div>
+      <p>地面上的致命尖刺陷阱，触之即伤。看到它就要提前起跳，用抛物线越过尖刺顶端。</p>
+    </div>
+    <div class="card">
+      <span class="tag">跳跃型</span>
+      <div class="imgbox"><img src="assets/gallery/07_crate.png" alt="木箱"></div>
+      <h3>木箱</h3>
+      <div class="en">Crate</div>
+      <p>结实的木质箱体，最常见的跳跃障碍。高度适中，普通跳跃即可翻越。</p>
+    </div>
+    <div class="card">
+      <span class="tag">跳跃型</span>
+      <div class="imgbox"><img src="assets/gallery/08_barrel.png" alt="木桶"></div>
+      <h3>木桶</h3>
+      <div class="en">Barrel</div>
+      <p>圆滚滚的木桶障碍，与木箱类似需要跳跃通过，常成组出现考验连跳节奏。</p>
+    </div>
+    <div class="card">
+      <span class="tag">双解</span>
+      <div class="imgbox"><img src="assets/gallery/09_arrow.png" alt="箭矢"></div>
+      <h3>箭矢</h3>
+      <div class="en">Arrow</div>
+      <p>悬在空中的利箭，位置比较刁钻：既可以选择下蹲滑过，也可以精准跳越，视空间而定。</p>
+    </div>
+    <div class="card">
+      <span class="tag">下蹲型</span>
+      <div class="imgbox"><img src="assets/gallery/10_bar.png" alt="横梁"></div>
+      <h3>横梁</h3>
+      <div class="en">Bar</div>
+      <p>悬吊在空中的木梁，占据上半身空间。跳跃必被磕头，正确解法是下蹲从梁下钻过。</p>
+    </div>
+    <div class="card">
+      <span class="tag">下蹲型</span>
+      <div class="imgbox"><img src="assets/gallery/11_beam.png" alt="长横梁"></div>
+      <h3>长横梁</h3>
+      <div class="en">Beam</div>
+      <p>横梁的加长版，下蹲通过的时间更长，需要保持下蹲姿态稳步前进，切忌中途起身。</p>
+    </div>
+    <div class="card">
+      <span class="tag">下蹲型</span>
+      <div class="imgbox"><img src="assets/gallery/12_ceil.png" alt="低天花板"></div>
+      <h3>低天花板</h3>
+      <div class="en">Ceiling</div>
+      <p>石砌的低矮隧道顶棚，几乎贴着地面。必须全程下蹲滑行通过，是下蹲玩法的终极考验。</p>
+    </div>
+  </div>
+
+  <!-- ============ 奖励 ============ -->
+  <div class="cat">
+    <div class="icon">★</div>
+    <h2>奖 励</h2>
+    <div class="line"></div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">分数 +10</span>
+      <div class="imgbox"><img src="assets/gallery/13_coin.png" alt="金币"></div>
+      <h3>金币</h3>
+      <div class="en">Coin</div>
+      <p>最基础的分值奖励，每枚 +10 分。常被放在跳跃路径的正中，鼓励玩家积极起跳收集。</p>
+    </div>
+    <div class="card">
+      <span class="tag">分数 +50</span>
+      <div class="imgbox"><img src="assets/gallery/14_gem.png" alt="宝石"></div>
+      <h3>宝石</h3>
+      <div class="en">Gem</div>
+      <p>闪耀的蓝色宝石，每颗 +50 分，价值是金币的五倍，通常藏在更刁钻的位置。</p>
+    </div>
+    <div class="card">
+      <span class="tag">回血</span>
+      <div class="imgbox"><img src="assets/gallery/15_heart.png" alt="红心"></div>
+      <h3>红心</h3>
+      <div class="en">Heart</div>
+      <p>悬在空中的治愈之心，跳跃撞上可回复 1~2 点生命，且能突破上限积累到 10 点。</p>
+    </div>
+    <div class="card">
+      <span class="tag">回血 +1</span>
+      <div class="imgbox"><img src="assets/gallery/16_potion.png" alt="药水"></div>
+      <h3>药水</h3>
+      <div class="en">Potion</div>
+      <p>绯红的治疗药水，拾取后稳定恢复 1 点生命，是残血时的救命稻草。</p>
+    </div>
+    <div class="card">
+      <span class="tag">护盾</span>
+      <div class="imgbox"><img src="assets/gallery/17_shield.png" alt="护盾"></div>
+      <h3>护盾</h3>
+      <div class="en">Shield</div>
+      <p>白色护盾，拾取后为你抵挡 1 次伤害，相当于多出一条命，适合在危险关卡前获取。</p>
+    </div>
+    <div class="card">
+      <span class="tag">吸附</span>
+      <div class="imgbox"><img src="assets/gallery/18_magnet.png" alt="磁铁"></div>
+      <h3>磁铁</h3>
+      <div class="en">Magnet</div>
+      <p>赤红磁铁，激活后自动吸附附近的金币与宝石，让收集不再需要精准走位。</p>
+    </div>
+    <div class="card">
+      <span class="tag">积分 x2</span>
+      <div class="imgbox"><img src="assets/gallery/19_star.png" alt="双倍星"></div>
+      <h3>双倍星</h3>
+      <div class="en">Star</div>
+      <p>金色星光，拾取后进入双倍积分状态，短时间内所有得分翻倍，是冲榜利器。</p>
+    </div>
+  </div>
+
+  <footer>
+    <b>图片来源</b>：角色 / 怪物 / 障碍 / 奖励像素图均基于游戏内 <b>js/sprites.js</b> 程序化美术（字符画 + 调色板）同风格绘制，
+    横梁与低天花板复刻 <b>js/obstacles.js</b> 渲染逻辑，未使用任何网络图片。<br>
+    美术基调：中世纪像素风 · 深紫背景 #0d0717 · 金色 UI #ffd75e · 羊皮纸 #f3e2b3 · Kenney CC0 素材风格
+  </footer>
+
+</div>
+</body>
+</html>

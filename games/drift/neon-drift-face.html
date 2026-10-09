@@ -1,0 +1,3273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>NEON DRIFT · Web 街机赛车（体感版 · 摄像头人脸控制）</title>
+<style>
+/* ============================================================
+ * 全局样式：街机霓虹风格 UI 层
+ * ========================================================== */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#05070d;}
+body{
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Courier New", monospace;
+  color:#eaf2ff; -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent; touch-action:none;
+}
+#stage{position:fixed;inset:0;overflow:hidden;}
+#screen{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:0;pointer-events:none;}
+.panel{
+  position:absolute; background:rgba(6,12,22,.55);
+  border:2px solid rgba(120,220,255,.35);
+  border-radius:10px; padding:6px 10px;
+  box-shadow:0 4px 18px rgba(0,0,0,.45), inset 0 0 18px rgba(80,200,255,.08);
+  backdrop-filter:blur(3px);
+}
+.hud-tl{top:12px;left:12px;display:flex;gap:8px;}
+.hud-tr{top:12px;right:12px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.chip{display:flex;flex-direction:column;line-height:1.1;}
+.chip .k{font-size:10px;letter-spacing:2px;color:#7fe3ff;opacity:.85;}
+.chip .v{font-size:20px;font-weight:700;color:#fff;text-shadow:0 0 10px rgba(120,220,255,.55);}
+.chip.big .v{font-size:26px;}
+
+/* 名次高亮 */
+#hud-pos.p1{color:#ffd75e;text-shadow:0 0 12px rgba(255,215,94,.7);}
+
+/* 提示气泡（进站圈 / 最快圈） */
+#toast{
+  position:absolute;top:22%;left:50%;transform:translateX(-50%);
+  font-size:clamp(16px,3.4vw,28px);font-weight:800;letter-spacing:2px;
+  color:#fff;text-shadow:0 0 16px rgba(0,0,0,.8);opacity:0;transition:opacity .25s;
+  white-space:nowrap;
+}
+#toast.show{opacity:1;}
+
+/* ---------- 倒计时 ---------- */
+#countdown{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+}
+#cd-text{
+  font-size:clamp(70px,20vw,190px);font-weight:900;letter-spacing:6px;
+  color:#fff;text-shadow:0 0 30px rgba(0,220,255,.9), 0 8px 0 rgba(0,0,0,.35);
+  transform:scale(1);opacity:0;
+}
+#cd-text.pop{animation:cdpop .85s ease-out;}
+@keyframes cdpop{
+  0%{opacity:0;transform:scale(2.4);}
+  18%{opacity:1;transform:scale(1);}
+  70%{opacity:1;transform:scale(1);}
+  100%{opacity:0;transform:scale(.85);}
+}
+#cd-text.go{color:#7dff9b;text-shadow:0 0 40px rgba(125,255,155,.95),0 8px 0 rgba(0,0,0,.35);}
+
+/* ---------- 遮罩层（开始 / 暂停 / 结算） ---------- */
+.overlay{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, rgba(10,20,40,.72), rgba(2,4,10,.93));
+  backdrop-filter:blur(4px);
+}
+.hidden{display:none !important;}
+.card{
+  width:min(92vw,560px);max-height:86vh;overflow:auto;
+  background:linear-gradient(160deg,rgba(16,26,46,.96),rgba(8,12,24,.96));
+  border:2px solid rgba(120,220,255,.35);border-radius:16px;padding:22px 22px 18px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 0 40px rgba(80,200,255,.06);
+}
+.card h1{
+  font-size:clamp(24px,5.4vw,40px);letter-spacing:3px;text-align:center;margin-bottom:4px;
+  background:linear-gradient(90deg,#7fe3ff,#ffd75e,#ff6ec7);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.card .sub{text-align:center;font-size:12px;color:#8fb4d6;letter-spacing:2px;margin-bottom:14px;}
+.card h2{font-size:20px;letter-spacing:2px;text-align:center;margin-bottom:10px;color:#ffd75e;}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 6px;}
+th,td{padding:6px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.09);}
+th{color:#7fe3ff;font-size:11px;letter-spacing:1px;font-weight:600;}
+td.rank{width:34px;font-weight:800;}
+tr.me td{background:rgba(120,220,255,.12);}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12.5px;color:#cfe3f7;margin:10px 0;}
+.keys b{color:#ffd75e;font-weight:700;}
+.btn{
+  display:block;width:100%;margin-top:14px;padding:12px;cursor:pointer;
+  font-family:inherit;font-size:15px;font-weight:800;letter-spacing:3px;color:#04121c;
+  background:linear-gradient(180deg,#8ff0ff,#31c6f0);border:0;border-radius:10px;
+  box-shadow:0 6px 0 #1a7fa3, 0 10px 22px rgba(0,0,0,.45);
+}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 #1a7fa3;}
+.btn.alt{background:linear-gradient(180deg,#ffd98a,#f0a93a);box-shadow:0 6px 0 #a86b12,0 10px 22px rgba(0,0,0,.45);}
+.btn.alt:active{box-shadow:0 3px 0 #a86b12;}
+
+/* ---------- 体感摄像头面板 ---------- */
+#facewrap{
+  position:absolute;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));
+  width:176px;border-radius:12px;overflow:hidden;
+  background:rgba(6,12,22,.65);border:2px solid rgba(120,220,255,.4);
+  box-shadow:0 4px 18px rgba(0,0,0,.5), inset 0 0 16px rgba(80,200,255,.08);
+  pointer-events:none;
+}
+#facewrap video,#facewrap canvas{display:block;width:100%;height:auto;}
+#facewrap video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+#facewrap canvas{position:relative;z-index:2;}
+#face-status{
+  position:relative;z-index:3;padding:4px 8px;font-size:10.5px;letter-spacing:.5px;
+  color:#7fe3ff;background:rgba(4,8,16,.72);border-top:1px solid rgba(120,220,255,.25);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* ---------- 移动端触控 ---------- */
+#pad{position:absolute;inset:0;pointer-events:none;}
+#pad .side{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;}
+#pad .left{left:14px;gap:12px;}
+#pad .right{right:14px;flex-direction:column;align-items:flex-end;gap:12px;}
+#pad .dup{display:flex;gap:10px;}
+.tbtn{
+  pointer-events:auto;width:74px;height:74px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;letter-spacing:1px;color:#eaf6ff;
+  background:rgba(10,22,40,.55);border:2px solid rgba(120,220,255,.45);
+  box-shadow:0 4px 14px rgba(0,0,0,.5), inset 0 0 20px rgba(90,200,255,.12);
+}
+.tbtn.wide{width:92px;height:92px;font-size:13px;}
+.tbtn.small{width:58px;height:58px;font-size:10px;}
+.tbtn.on{background:rgba(120,220,255,.35);transform:scale(.94);}
+#btn-brake{background:rgba(60,14,14,.55);border-color:rgba(255,120,110,.5);}
+#btn-brake.on{background:rgba(255,90,80,.45);}
+#btn-nitro{
+  width:78px;height:78px;
+  background:linear-gradient(180deg,rgba(50,120,255,.65),rgba(20,60,180,.65));
+  border-color:rgba(150,225,255,.7);
+  box-shadow:0 4px 14px rgba(0,0,0,.5), inset 0 0 22px rgba(150,225,255,.35);
+  font-weight:900;letter-spacing:1px;
+}
+#btn-nitro.on{
+  background:linear-gradient(180deg,rgba(150,225,255,.95),rgba(60,150,255,.95));
+  color:#04121c;transform:scale(.94);
+  box-shadow:0 0 26px rgba(120,220,255,.9);
+}
+#btn-nitro.spent{opacity:.42;}
+
+/* 右上角小工具按钮 */
+#tools{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto;}
+.tool{
+  pointer-events:auto;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:1px;
+  padding:6px 10px;border-radius:8px;color:#cfe3f7;
+  background:rgba(6,12,22,.55);border:1px solid rgba(120,220,255,.3);
+}
+.tool:active{background:rgba(120,220,255,.25);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen"></canvas>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud">
+    <div class="hud-tl">
+      <div class="panel chip"><span class="k">LAP 圈数</span><span class="v" id="hud-lap">1/3</span></div>
+      <div class="panel chip"><span class="k">POS 名次</span><span class="v" id="hud-pos">5/5</span></div>
+    </div>
+    <div class="hud-tr">
+      <div class="panel chip big"><span class="k">TIME 计时</span><span class="v" id="hud-time">0:00.00</span></div>
+      <div class="panel chip"><span class="k">BEST LAP 最快圈</span><span class="v" id="hud-best">--:--.--</span></div>
+    </div>
+    <div id="toast"></div>
+    <div id="tools">
+      <button class="tool" id="btn-pause">PAUSE 暂停</button>
+      <button class="tool" id="btn-mute">SOUND 开</button>
+      <button class="tool" id="btn-restart">RESTART 重开</button>
+      <button class="tool hidden" id="btn-calib">FACE 校准 (C)</button>
+    </div>
+    <!-- 体感摄像头预览（体感模式下显示） -->
+    <div id="facewrap" class="hidden">
+      <video id="face-video" playsinline muted></video>
+      <canvas id="face-canvas" width="176" height="132"></canvas>
+      <div id="face-status">摄像头未启动</div>
+    </div>
+  </div>
+
+  <!-- ===== 起步倒计时 ===== -->
+  <div id="countdown"><div id="cd-text"></div></div>
+
+  <!-- ===== 移动端触控 ===== -->
+  <div id="pad" class="hidden">
+    <div class="side left">
+      <div class="tbtn" id="btn-left">◀ 左</div>
+      <div class="tbtn" id="btn-right">右 ▶</div>
+    </div>
+    <div class="side right">
+      <div class="dup">
+        <div class="tbtn wide" id="btn-brake">刹车 ▼</div>
+        <div class="tbtn wide" id="btn-gas">油门 ▲</div>
+      </div>
+      <div class="dup">
+        <div class="tbtn small" id="btn-drift">漂移</div>
+        <div class="tbtn nitro" id="btn-nitro">N₂O</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 开始界面 ===== -->
+  <div class="overlay" id="ov-start">
+    <div class="card">
+      <h1>NEON DRIFT</h1>
+      <div class="sub">NATIVE CANVAS 伪 3D · 街机赛车 · 体感版</div>
+      <div class="keys">
+        <b style="color:#8ff0ff">抬头 / 抬下巴</b><span style="color:#8ff0ff">加速</span>
+        <b style="color:#8ff0ff">低头 / 收下巴</b><span style="color:#8ff0ff">减速 / 刹车</span>
+        <b style="color:#8ff0ff">下巴居中</b><span style="color:#8ff0ff">保持原速（定速巡航）</span>
+        <b style="color:#8ff0ff">歪头向左 / 向右</b><span style="color:#8ff0ff">车辆向左 / 向右转向</span>
+        <b style="color:#ffd75e">C 键 / FACE 校准</b><span style="color:#ffd75e">重新校准中立姿势（坐姿变了就按一下）</span>
+        <b>W / ↑</b><span>键盘备用：加速</span>
+        <b>S / ↓</b><span>键盘备用：刹车 / 倒车减速</span>
+        <b>A D / ← →</b><span>键盘备用：转向</span>
+        <b>空格 Space</b><span>手刹漂移（过弯神器）</span>
+        <b>Shift / N</b><span style="color:#8ff0ff">氮气加速 N₂O（松开自动回充）</span>
+        <b>1 / 2 / 3</b><span style="color:#ffd75e">瞬间移动到第 1 / 2 / 3 名车手身后</span>
+        <b>R</b><span>重新开始</span>
+        <b>P / Esc</b><span>暂停</span>
+      </div>
+      <button class="btn" id="btn-start-face" style="background:linear-gradient(180deg,#b49bff,#7b5cff);box-shadow:0 6px 0 #4a32a8,0 10px 22px rgba(0,0,0,.45)">FACE 体感模式 · 摄像头开始</button>
+      <button class="btn alt" id="btn-start">KEYBOARD 键盘模式开始</button>
+      <div style="font-size:11px;color:#7fa3c4;text-align:center;margin-top:10px;line-height:1.7">
+        体感模式需要<b style="color:#8ff0ff">摄像头权限</b>与<b style="color:#8ff0ff">联网</b>（首次加载人脸识别模型）<br>
+        3 圈制 · <b style="color:#8ff0ff">4 台车竞速</b>（你 + 3 名 AI）· 冲出护栏会<b style="color:#ffd75e">自动回到赛道中央</b>继续比赛<br>
+        体感随时可用键盘接管：漂移 / 氮气 / 瞬移仍由键盘操作
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 暂停界面 ===== -->
+  <div class="overlay hidden" id="ov-pause">
+    <div class="card">
+      <h1>PAUSED</h1>
+      <div class="sub">比赛已暂停</div>
+      <div style="font-size:11px;color:#7fa3c4;text-align:center;margin-bottom:6px">
+        体感提示：坐姿变了请按 <b style="color:#ffd75e">C</b> 重新校准中立姿势
+      </div>
+      <button class="btn" id="btn-resume">RESUME 继续</button>
+      <button class="btn alt" id="btn-quit">RESTART 重新开始</button>
+    </div>
+  </div>
+
+  <!-- ===== 结算界面 ===== -->
+  <div class="overlay hidden" id="ov-result">
+    <div class="card">
+      <h1 id="res-title">RACE FINISH</h1>
+      <div class="sub" id="res-sub">最终成绩</div>
+      <table id="res-table"></table>
+      <button class="btn" id="btn-again">RACE AGAIN 再来一局</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==========================================================================
+ * NEON DRIFT —— 原生 Canvas 街机赛车
+ * 无第三方引擎：伪 3D（透视投影）渲染 + 自研物理 + AI + UI
+ *
+ * 模块索引：
+ *   1. Util          数学 / 投影 / 缓动 工具
+ *   2. PALETTE/CFG   调色板与全局可调参数
+ *   3. ASSET_CONFIG  资源配置（URL / Base64 / 本地路径 / 占位符 四选一）
+ *   4. Procedural    程序化生成低多边形贴图（资源失败时的回退绘制）
+ *   5. AssetManager  资源加载器（三级回退，永不阻塞游戏）
+ *   6. Sound         WebAudio 合成音效（外部音频失败时回退）
+ *   7. Track         赛道构建（弯道 / 坡度 / 场景物件 / 迷你地图）
+  *   8. Input         键盘 + 触控 + 暂停（键盘/触控与体感输入分层合并）
+  *  8.5 FaceControl   ★体感版新增：摄像头人脸姿态 → 虚拟按键（MediaPipe）
+ *   9. Physics       玩家赛车物理（加速/刹车/转向/摩擦/惯性/漂移）
+ *  10. AI            AI 对手（路径跟随 / 弯前减速 / 避让超车）
+ *  11. Renderer      伪 3D 渲染（路面 / 护栏 / 精灵 / 车辆 / 仪表 / 小地图）
+ *  12. UI            HUD、倒计时、结算
+ *  13. Game          状态机 + 游戏主循环（requestAnimationFrame）
+ * ======================================================================== */
+
+
+/* ==========================================================================
+ * 1. Util —— 工具模块
+ * ======================================================================== */
+const Util = (function () {
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  return {
+    clamp: clamp,
+    /** 线性插值 */
+    lerp: (a, b, t) => a + (b - a) * t,
+    /** 缓动：进入 / 退出 / 进出（用于赛道坡度与弯道的平滑过渡） */
+    easeIn:     (a, b, p) => a + (b - a) * Math.pow(p, 2),
+    easeOut:    (a, b, p) => a + (b - a) * (1 - Math.pow(1 - p, 2)),
+    easeInOut:  (a, b, p) => a + (b - a) * ((-Math.cos(p * Math.PI) / 2) + 0.5),
+    rand:       (a, b) => a + Math.random() * (b - a),
+    randInt:    (a, b) => Math.floor(a + Math.random() * (b - a + 1)),
+    pick:       (arr) => arr[Math.floor(Math.random() * arr.length)],
+    /** 在 [0,total) 内的剩余百分比 */
+    pctRemaining: (n, total) => (n % total) / total,
+    /** 指数雾：distance=0 → 1（无雾）；distance=1 → 接近 0（全雾） */
+    expFog: (distance, density) => 1 / Math.pow(Math.E, distance * distance * density),
+    /** 环形回绕到 [0,max) */
+    wrap: (v, max) => { const r = v % max; return r < 0 ? r + max : r; },
+    /** 环形递增（不会溢出） */
+    increase: (start, inc, max) => Util.wrap(start + inc, max),
+    /** 加速度积分 */
+    accelerate: (v, accel, dt) => v + accel * dt,
+    /** 一维 AABB 重叠检测（pct 为宽容系数） */
+    overlap: (x1, w1, x2, w2, pct) => {
+      const h = (pct || 1) / 2;
+      return !((x1 + w1 * h < x2 - w2 * h) || (x1 - w1 * h > x2 + w2 * h));
+    },
+    /**
+     * 核心：把世界坐标点投影到屏幕（透视投影）
+     * 这是整个伪 3D 的数学基石，见文件末尾《渲染原理》。
+     */
+    project: function (p, cameraX, cameraY, cameraZ, cameraDepth, width, height, roadWidth) {
+      p.camera.x = (p.world.x || 0) - cameraX;
+      p.camera.y = (p.world.y || 0) - cameraY;
+      p.camera.z = (p.world.z || 0) - cameraZ;
+      p.screen.scale = cameraDepth / p.camera.z;                                   // 1/z 透视缩放
+      p.screen.x = Math.round((width / 2) + (p.screen.scale * p.camera.x * width / 2));
+      p.screen.y = Math.round((height / 2) - (p.screen.scale * p.camera.y * height / 2));
+      p.screen.w = Math.round(p.screen.scale * roadWidth * width / 2);             // 路面半宽（像素）
+    },
+    /** 时间格式化 m:ss.cc */
+    fmtTime: function (t) {
+      if (t == null || !isFinite(t)) return '--:--.--';
+      const m = Math.floor(t / 60);
+      const s = Math.floor(t - m * 60);
+      const c = Math.floor((t - Math.floor(t)) * 100);
+      return m + ':' + String(s).padStart(2, '0') + '.' + String(c).padStart(2, '0');
+    },
+    shade: function (hex, amt) { // 颜色明暗调整，用于低多边形明暗面
+      const n = parseInt(hex.slice(1), 16);
+      let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      r = clamp(Math.round(r + amt), 0, 255);
+      g = clamp(Math.round(g + amt), 0, 255);
+      b = clamp(Math.round(b + amt), 0, 255);
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+  };
+})();
+
+
+/* ==========================================================================
+ * 2. PALETTE / CFG —— 调色板与全局参数
+ * ======================================================================== */
+const PALETTE = {
+  skyTop:    '#123a7a',
+  skyMid:    '#3f8fd6',
+  skyLow:    '#9fd4f2',
+  horizon:   '#e8f3f7',
+  fog:       '#dfeaf0',
+  sun:       '#fff6c9',
+  mountFar:  '#93b8d8',  mountFarDark:  '#7ba0c6',
+  mountNear: '#4f7fa8',  mountNearDark: '#3c6890',
+  grassL:    '#3fa96b',  grassD:        '#359a5f',
+  rumbleL:   '#f0f0f3',  rumbleD:       '#d8382f',
+  roadL:     '#494f5c',  roadD:         '#424856',
+  lane:      '#f4f4f6',
+  edgeLine:  '#ffffff',
+  startA:    '#ffffff',  startB:        '#22262d',
+  railPost:  '#c9d3dd',  railBeam:      '#eef3f8', railShadow: '#93a1b0'
+};
+
+const CFG = {
+  /* —— 赛道几何 —— */
+  segmentLength: 200,      // 单段赛道长度（世界单位）
+  rumbleLength:  3,        // 每 3 段切换一次路肩配色
+  lanes:         3,        // 车道数
+  roadWidth:     2000,     // 路面【半】宽（世界单位）→ 全宽 4000
+  drawDistance:  180,      // 绘制段数（远端雾外剔除）
+  fieldOfView:   100,      // 视场角（度）
+  cameraHeight:  1000,     // 摄像机离地高度
+  fogDensity:    4.2,      // 雾浓度
+
+  /* —— 比赛 —— */
+  totalLaps: 3,
+  aiCount:   3,            // AI 数量（★ 4 台车总参赛 = 玩家 + 3 AI）
+  countdown: 3,            // 起步倒计时秒数
+
+  /* —— 瞬移（按键 1/2/3 追到第 1/2/3 名车手身后） —— */
+  teleportGap:  560,       // 到达位置：目标车身后方留出的距离（世界单位，≈2.8 段）
+  teleportGrace:0.60,      // 瞬移后的短暂无敌（秒），防止贴脸追尾
+  teleportFx:   0.45,      // 瞬移特效持续时长（秒）
+
+  /* —— 赛车物理 —— */
+  steerRate:     2.05,     // 满速满舵横向速度（offset 单位 / 秒）
+  centrifugal:   0.34,     // 离心力系数（弯道把车往外推）
+  driftBoost:    1.95,     // 手刹漂移时横向速度倍率
+  driftScrub:    0.55,     // 漂移时的纵向速度损耗系数
+  gripNormal:    9.0,      // 正常抓地：横向速度跟随输入的响应速度
+  gripDrift:     3.2,      // 漂移时响应更慢 → 产生"甩尾"感
+  steerSmooth:   9.0,      // 方向盘回正/打舵平滑
+
+  /* —— 边界规则 —— */
+  edgeRoad:   1.00,        // |x| > 1.00 → 进入路肩（掉速 + 抖动）
+  edgeWall:   1.18,        // |x| > 1.18 → 撞护栏（★ 触发"回到赛道中央"重生）
+  wallBounce: 0.55,        // 撞墙后保留的速度比例
+
+  /* —— 撞墙重生（回到赛道中央） —— */
+  respawnTime:      0.55,  // 重生过程时长（秒）：此期间车辆自动滑回中央、玩家失去控制
+  respawnSpeedKeep: 0.40,  // 重生后保留的速度比例
+  respawnSpeedCap:  0.34,  // 重生后速度上限（占 maxSpeed 的比例）
+  respawnGrace:     0.45,  // 重生结束后的短暂无敌时间（秒），防止二次撞墙
+
+  /* —— 氮气加速 NITRO —— */
+  nitroMax:       1.00,    // 氮气槽容量
+  nitroStart:     0.55,    // 开局初始氮气量
+  nitroDrain:     0.34,    // 每秒消耗（满槽可喷约 3 秒）
+  nitroRegen:     0.075,   // 每秒回复（约 13 秒回满）
+  nitroMinToFire: 0.12,    // 低于此值无法点火（防止"点一下放一帧"）
+  nitroSpeedMul:  1.42,    // 氮气期间最高速倍率
+  nitroAccelMul:  2.60,    // 氮气期间加速度倍率
+  nitroFov:       0.92,    // 氮气期间焦距缩放（<1 = 视野变广，速度冲击感）
+  nitroDrainAI:   0.24,    // AI 氮气消耗（更保守）
+
+  /* —— 碰撞体尺寸 —— */
+  carWorldW:   720,        // 车宽（世界单位，与 roadWidth 同坐标系）
+  carOffsetW:  0.36,       // 车宽（offset 单位 = 720/2000）
+  carWorldLen: 520,        // 车长（用于 Z 轴重叠判定）
+
+  /* —— 摄像机 —— */
+  cameraLag: 0.16,         // 摄像机横向跟随延迟（越小越跟手）
+
+  ROAD: {
+    LENGTH: { NONE: 0, SHORT:  25, MEDIUM:  50, LONG:  100 },
+    CURVE:  { NONE: 0, EASY:    2, MEDIUM:   4, HARD:    6 },
+    HILL:   { NONE: 0, LOW:    20, MEDIUM:  40, HIGH:    60 }
+  }
+};
+// 由视场角推导摄像机深度（焦距）—— 透视强度的唯一来源
+CFG.cameraDepth = 1 / Math.tan((CFG.fieldOfView / 2) * Math.PI / 180);
+// 玩家车相对摄像机的前移距离 = 摄像机高度 × 焦距
+CFG.playerZ     = CFG.cameraHeight * CFG.cameraDepth;
+// 最高速：一帧（1/60s）最多推进一个 segmentLength
+CFG.maxSpeed    = CFG.segmentLength * 60;
+CFG.accel       = CFG.maxSpeed / 5.2;
+CFG.braking     = -CFG.maxSpeed / 1.5;
+CFG.decel       = -CFG.maxSpeed / 7;
+CFG.offRoadDecel = -CFG.maxSpeed / 2.2;
+CFG.offRoadLimit = CFG.maxSpeed / 4;
+
+const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+if (IS_TOUCH) CFG.drawDistance = 130;   // 移动端降低绘制段数保帧率
+
+
+/* ==========================================================================
+ * 3. ASSET_CONFIG —— 资源配置（★ 可替换素材的唯一入口）
+ * --------------------------------------------------------------------------
+ * 每个资源支持四种来源，按优先级依次尝试：
+ *   ① url      : 任意 http(s) / 相对路径地址
+ *   ② path     : 本地路径字符串（与 url 等价，语义更清晰）
+ *   ③ base64   : data:image/png;base64,... 内联数据
+ *   ④ procedural : 程序化占位符（当以上全部缺失或加载失败时使用）
+ * 加载失败（404 / 跨域 / 解码失败）不会抛错，自动回退到程序化绘制，游戏照常运行。
+ * ======================================================================== */
+const ASSET_CONFIG = {
+  version: '1.0.0',
+
+  images: {
+    /* worldW / worldH：世界尺寸（与 roadWidth=2000 同一坐标系），非像素 */
+    treePine:  { url: '', path: '', base64: '', procedural: 'pine',      worldW: 760,  worldH: 1500 },
+    treeRound: { url: '', path: '', base64: '', procedural: 'broadleaf', worldW: 1080, worldH: 1320 },
+    rock:      { url: '', path: '', base64: '', procedural: 'rock',      worldW: 620,  worldH: 460  },
+    billboard: { url: '', path: '', base64: '', procedural: 'billboard', worldW: 1000, worldH: 900  },
+    cone:      { url: '', path: '', base64: '', procedural: 'cone',      worldW: 240,  worldH: 280, solid: true },
+    // 玩家/AI 车贴图：留空 → 运行时用矢量低多边形绘制（可转向变形）；填入图片则使用该图
+    carPlayer: { url: '', path: '', base64: '', procedural: null },
+    carAI:     { url: '', path: '', base64: '', procedural: null }
+  },
+
+  audio: {
+    countdown: { url: '', synth: 'beep'    },   // 3/2/1 提示音
+    go:        { url: '', synth: 'go'      },   // GO!
+    crash:     { url: '', synth: 'crash'   },   // 撞车 / 撞护栏
+    offroad:   { url: '', synth: 'rumble'  },   // 冲出路面
+    lap:       { url: '', synth: 'lap'     },   // 完成一圈
+    engine:    { url: '', synth: 'engine'  }    // 引擎（持续音）
+  },
+
+  /* 自定义字体：留空则使用系统等宽字体 */
+  fonts: { name: 'NeonRacer', url: '' },
+
+  /* 背景主题色（改这里即可换皮） */
+  theme: PALETTE
+};
+
+
+/* ==========================================================================
+ * 4. Procedural —— 程序化生成低多边形贴图（占位符回退绘制）
+ * ======================================================================== */
+const Procedural = (function () {
+  function make(w, h) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(2, Math.round(w));
+    c.height = Math.max(2, Math.round(h));
+    return c;
+  }
+  function poly(ctx, pts, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fill();
+  }
+  /** 低多边形"三角"：整体暗色 + 左半亮色，形成两个面 */
+  function facetedTri(ctx, cx, apexY, halfW, height, base, light) {
+    const by = apexY + height;
+    poly(ctx, [[cx, apexY], [cx + halfW, by], [cx - halfW, by]], base);
+    poly(ctx, [[cx, apexY], [cx - halfW, by], [cx, by]], light);
+  }
+
+  const painters = {
+    /** 针叶树：树干 + 3 层双面三角 */
+    pine(ctx, w, h) {
+      poly(ctx, [[w * .44, h * .60], [w * .56, h * .60], [w * .56, h * 1.0], [w * .44, h * 1.0]], '#6b4a2f');
+      facetedTri(ctx, w * .5, h * .00, w * .30, h * .42, '#2e7d4c', '#3d9a5e');
+      facetedTri(ctx, w * .5, h * .28, w * .38, h * .40, '#347f4f', '#419a5f');
+      facetedTri(ctx, w * .5, h * .54, w * .47, h * .40, '#3a8a58', '#4aa86a');
+    },
+    /** 阔叶树：树干 + 六边形冠（双面色） */
+    broadleaf(ctx, w, h) {
+      poly(ctx, [[w * .46, h * .55], [w * .54, h * .55], [w * .56, h * 1.0], [w * .44, h * 1.0]], '#7a5233');
+      const cx = w * .5, cy = h * .34, rx = w * .46, ry = h * .38;
+      const pts = [];
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 - Math.PI / 2;
+        pts.push([cx + Math.cos(a) * rx * Util.rand(.88, 1), cy + Math.sin(a) * ry * Util.rand(.88, 1)]);
+      }
+      poly(ctx, pts, '#2f8d52');
+      // 左半受光面
+      const left = [[cx, cy - ry]];
+      for (let i = 3; i <= 6; i++) left.push(pts[i]);
+      left.push([cx, cy + ry * .6]);
+      poly(ctx, left, '#41a866');
+    },
+    /** 岩石：低多边形块体 */
+    rock(ctx, w, h) {
+      const pts = [[w * .05, h * 1.0], [w * .18, h * .52], [w * .42, h * .18],
+                   [w * .72, h * .26], [w * .95, h * .66], [w * .88, h * 1.0]];
+      poly(ctx, pts, '#8e9aa6');
+      poly(ctx, [[w * .05, h * 1.0], [w * .18, h * .52], [w * .42, h * .18], [w * .52, h * 1.0]], '#aeb9c4');
+      poly(ctx, [[w * .42, h * .18], [w * .72, h * .26], [w * .95, h * .66], [w * .6, h * .5]], '#7c8793');
+    },
+    /** 广告牌：立柱 + 双色面板 + 文字 */
+    billboard(ctx, w, h) {
+      poly(ctx, [[w * .45, h * .35], [w * .55, h * .35], [w * .55, h * 1.0], [w * .45, h * 1.0]], '#5b6570');
+      poly(ctx, [[w * .02, h * .04], [w * .98, h * .04], [w * .98, h * .42], [w * .02, h * .42]], '#101828');
+      poly(ctx, [[w * .02, h * .04], [w * .50, h * .04], [w * .50, h * .42], [w * .02, h * .42]], '#ff5f8d');
+      ctx.fillStyle = '#0b1220';
+      ctx.font = 'bold ' + Math.round(h * .17) + 'px monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('TURBO', w * .5, h * .23);
+      ctx.strokeStyle = '#c9d3dd'; ctx.lineWidth = Math.max(2, w * .012);
+      ctx.strokeRect(w * .02, h * .04, w * .96, h * .38);
+    },
+    /** 路障锥（可碰撞障碍物） */
+    cone(ctx, w, h) {
+      poly(ctx, [[w * .06, h * 1.0], [w * .94, h * 1.0], [w * .88, h * .86], [w * .12, h * .86]], '#2b2f36');
+      poly(ctx, [[w * .5, h * .04], [w * .84, h * .88], [w * .16, h * .88]], '#ff7a2f');
+      poly(ctx, [[w * .5, h * .04], [w * .5, h * .88], [w * .16, h * .88]], '#ff9a55');
+      poly(ctx, [[w * .31, h * .46], [w * .69, h * .46], [w * .72, h * .62], [w * .28, h * .62]], '#f4f4f6');
+    },
+    /** 灌木 */
+    bush(ctx, w, h) {
+      facetedTri(ctx, w * .30, h * .45, w * .30, h * .55, '#2c7a4a', '#3c9a5e');
+      facetedTri(ctx, w * .70, h * .55, w * .26, h * .45, '#2c7a4a', '#3c9a5e');
+    }
+  };
+
+  return {
+    /** 生成一张程序化贴图；未知类型返回 null */
+    create(name, w, h) {
+      const p = painters[name];
+      if (!p) return null;
+      const c = make(w, h);
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      try { p(ctx, c.width, c.height); } catch (e) { /* 绘制失败也不影响运行 */ }
+      return c;
+    },
+    paint: painters
+  };
+})();
+
+
+/* ==========================================================================
+ * 5. AssetManager —— 资源加载器（三级回退，永不阻塞）
+ * ======================================================================== */
+const AssetManager = (function () {
+  const store = { images: {}, audio: {} };
+  let failed = [];
+
+  function resolve(cfg) { return (cfg.url || cfg.path || cfg.base64 || '').trim(); }
+
+  function loadImage(key, cfg) {
+    return new Promise((resolvePromise) => {
+      const src = resolve(cfg);
+      const done = (img, from) => { store.images[key] = img ? { el: img, from: from } : null; resolvePromise(); };
+      if (!src) {                                   // 无外部资源 → 程序化占位
+        const pc = cfg.procedural ? Procedural.create(cfg.procedural, 256, 256) : null;
+        return done(pc, 'procedural');
+      }
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      let settled = false;
+      const t = setTimeout(() => { if (!settled) { settled = true; failed.push(key + '(timeout)'); fallback(); } }, 6000);
+      function fallback() {
+        const pc = cfg.procedural ? Procedural.create(cfg.procedural, 256, 256) : null;
+        done(pc, 'procedural-fallback');
+      }
+      img.onload = () => { if (settled) return; settled = true; clearTimeout(t); done(img, 'external'); };
+      img.onerror = () => { if (settled) return; settled = true; clearTimeout(t); failed.push(key); fallback(); };
+      img.src = src;
+    });
+  }
+
+  return {
+    failed: failed,
+    /** 并行加载所有资源（全部 Promise 都会 resolve，不会 reject） */
+    load(cfg) {
+      const jobs = [];
+      for (const key in cfg.images) jobs.push(loadImage(key, cfg.images[key]));
+      // 自定义字体（可选）
+      if (cfg.fonts && cfg.fonts.url) {
+        try {
+          const st = document.createElement('style');
+          st.textContent = "@font-face{font-family:'" + (cfg.fonts.name || 'NeonRacer') +
+            "';src:url('" + cfg.fonts.url + "') format('truetype');font-display:swap;}";
+          document.head.appendChild(st);
+        } catch (e) { /* 字体失败 → 使用系统字体 */ }
+      }
+      return Promise.all(jobs);
+    },
+    /** 取贴图元素（HTMLCanvasElement / HTMLImageElement），不存在返回 null */
+    get(key) { const v = store.images[key]; return v ? v.el : null; },
+    /** 该贴图是否为程序化占位（用于判断是否需要运行时矢量绘制） */
+    isProcedural(key) { const v = store.images[key]; return !v || v.from !== 'external'; }
+  };
+})();
+
+
+/* ==========================================================================
+ * 6. Sound —— WebAudio 合成音效（外部音频缺失时的回退方案）
+ * ======================================================================== */
+const Sound = (function () {
+  let ctx = null, master = null, engine = null, enabled = true, ready = false;
+
+  function init() {
+    if (ready) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { ready = true; return; }
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0.5;
+      master.connect(ctx.destination);
+      ready = true;
+    } catch (e) { ready = true; ctx = null; }
+  }
+  function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+
+  function tone(freq, dur, type, vol, slideTo) {
+    if (!enabled || !ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, ctx.currentTime);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), ctx.currentTime + dur);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.25, ctx.currentTime + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+    o.connect(g); g.connect(master);
+    o.start(); o.stop(ctx.currentTime + dur + 0.02);
+  }
+  function noise(dur, vol, filterFreq) {
+    if (!enabled || !ctx) return;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = filterFreq || 900;
+    const g = ctx.createGain(); g.gain.value = vol || 0.35;
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start();
+  }
+
+  return {
+    init: init, resume: resume,
+    isOn: () => enabled,
+    toggle() { enabled = !enabled; if (!enabled && engine) this.stopEngine(); return enabled; },
+    beep(f, d, t, v) { init(); tone(f, d, t || 'square', v); },
+    go()      { init(); tone(660, .12, 'square', .3); setTimeout(() => tone(990, .38, 'square', .32), 130); },
+    count()   { init(); tone(620, .14, 'square', .28); },
+    crash()   { init(); noise(.34, .5, 420); tone(150, .28, 'sawtooth', .3, 60); },
+    rumble()  { init(); noise(.14, .12, 240); },
+    lap()     { init(); tone(880, .1, 'triangle', .26); setTimeout(() => tone(1180, .16, 'triangle', .26), 110); },
+    /** 氮气点火：上扬扫频 + 一层白噪"泄压"声 */
+    nitro() {
+      init(); if (!ctx || !enabled) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(180, t);
+      o.frequency.exponentialRampToValueAtTime(1500, t + 0.42);
+      f.type = 'bandpass'; f.frequency.setValueAtTime(700, t);
+      f.frequency.exponentialRampToValueAtTime(3200, t + 0.42);
+      f.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.20, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(f); f.connect(g); g.connect(master);
+      o.start(); o.stop(t + 0.55);
+      noise(0.28, 0.22, 2600);
+    },
+    /** 撞墙重生提示音 */
+    respawn() { init(); tone(520, .18, 'sine', .22, 240); noise(.22, .2, 500); },
+    /** 瞬移音效：上扬风切 + 细碎噪声，模拟"咻"地追上前车 */
+    warp() {
+      init(); if (!ctx || !enabled) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(300, t);
+      o.frequency.exponentialRampToValueAtTime(2100, t + 0.22);
+      f.type = 'highpass'; f.frequency.value = 900;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(f); f.connect(g); g.connect(master);
+      o.start(); o.stop(t + 0.28);
+      noise(0.18, 0.16, 3200);
+    },
+    startEngine() {
+      init(); if (!ctx || engine) return;
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      const f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o1.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = -12;
+      f.type = 'lowpass'; f.frequency.value = 700;
+      g.gain.value = 0.0;
+      o1.connect(f); o2.connect(f); f.connect(g); g.connect(master);
+      o1.start(); o2.start();
+      engine = { o1: o1, o2: o2, f: f, g: g };
+    },
+    setEngine(pct, load) {
+      if (!engine || !ctx || !enabled) return;
+      const base = 58 + pct * 250;
+      const t = ctx.currentTime;
+      engine.o1.frequency.setTargetAtTime(base, t, .06);
+      engine.o2.frequency.setTargetAtTime(base * .5, t, .06);
+      engine.f.frequency.setTargetAtTime(420 + pct * 1500, t, .08);
+      engine.g.gain.setTargetAtTime(enabled ? (0.035 + pct * 0.05) * (load ? 1 : .55) : 0, t, .08);
+    },
+    stopEngine() {
+      if (!engine) return;
+      try { engine.o1.stop(); engine.o2.stop(); } catch (e) {}
+      engine = null;
+    }
+  };
+})();
+
+
+/* ==========================================================================
+ * 7. Track —— 赛道构建模块
+ * 赛道 = 一串 segment，每个 segment 记录：曲线量 curve、两端高度 world.y、场景精灵
+ * ======================================================================== */
+const Track = (function () {
+  let segments = [];
+  let length = 0;
+
+  function lastY() { return segments.length === 0 ? 0 : segments[segments.length - 1].p2.world.y; }
+
+  function addSegment(curve, y) {
+    const n = segments.length;
+    segments.push({
+      index: n,
+      p1: { world: { x: 0, y: lastY(), z: n * CFG.segmentLength }, camera: {}, screen: {} },
+      p2: { world: { x: 0, y: y, z: (n + 1) * CFG.segmentLength }, camera: {}, screen: {} },
+      curve: curve,
+      sprites: [],
+      cars: [],
+      color: Math.floor(n / CFG.rumbleLength) % 2 ? 'DARK' : 'LIGHT',
+      startLine: false,
+      fog: 1, clip: 0, visible: false, looped: false
+    });
+  }
+
+  /**
+   * 添加一段路：enter 入弯 / hold 保持 / leave 出弯（段数）
+   * curve: 曲率（正=右弯，负=左弯）；y: 高度变化
+   */
+  function addRoad(enter, hold, leave, curve, y) {
+    const startY = lastY();
+    const endY = startY + (Util.clamp(y | 0, -200, 200) * CFG.segmentLength);
+    const total = enter + hold + leave;
+    let n;
+    for (n = 0; n < enter; n++) addSegment(Util.easeIn(0, curve, n / enter), Util.easeInOut(startY, endY, n / total));
+    for (n = 0; n < hold; n++)  addSegment(curve, Util.easeInOut(startY, endY, (enter + n) / total));
+    for (n = 0; n < leave; n++) addSegment(Util.easeInOut(curve, 0, n / leave), Util.easeInOut(startY, endY, (enter + hold + n) / total));
+  }
+  const L = CFG.ROAD.LENGTH, C = CFG.ROAD.CURVE, H = CFG.ROAD.HILL;
+  function addStraight(num) { num = num || L.MEDIUM; addRoad(num, num, num, 0, 0); }
+  function addHill(num, height) { num = num || L.MEDIUM; height = height || H.MEDIUM; addRoad(num, num, num, 0, height); }
+  function addCurve(num, curve, height) {
+    num = num || L.MEDIUM; curve = curve || C.MEDIUM; height = height || H.NONE;
+    addRoad(num, num, num, curve, height);
+  }
+  function addLowRollingHills(num, height) {
+    num = num || L.SHORT; height = height || H.LOW;
+    addRoad(num, num, num, 0, height / 2);
+    addRoad(num, num, num, 0, -height);
+    addRoad(num, num, num, C.EASY, height);
+    addRoad(num, num, num, 0, 0);
+    addRoad(num, num, num, -C.EASY, height / 2);
+    addRoad(num, num, num, 0, 0);
+  }
+  function addSCurves() {
+    addRoad(L.MEDIUM, L.MEDIUM, L.MEDIUM, -C.EASY, H.NONE);
+    addRoad(L.MEDIUM, L.MEDIUM, L.MEDIUM, C.MEDIUM, H.MEDIUM);
+    addRoad(L.MEDIUM, L.MEDIUM, L.MEDIUM, C.EASY, -H.LOW);
+    addRoad(L.MEDIUM, L.MEDIUM, L.MEDIUM, -C.EASY, H.MEDIUM);
+    addRoad(L.MEDIUM, L.MEDIUM, L.MEDIUM, -C.MEDIUM, -H.MEDIUM);
+  }
+  function addBumps() {
+    const seq = [5, -2, -5, 8, 5, -7, 5, -2];
+    for (let i = 0; i < seq.length; i++) addRoad(10, 10, 10, 0, seq[i]);
+  }
+  /** 收尾：把高度平滑降回 0，保证赛道首尾无缝衔接 */
+  function addDownhillToEnd(num) {
+    num = num || 200;
+    addRoad(num, num, num, -C.EASY, -lastY() / CFG.segmentLength);
+  }
+
+  /** 在指定 segment 上挂一个场景精灵 */
+  function addSprite(index, type, offset, opts) {
+    const seg = segments[index % segments.length];
+    const cfg = ASSET_CONFIG.images[type] || {};
+    const sp = {
+      type: type,
+      offset: offset,
+      img: AssetManager.get(type),
+      worldW: cfg.worldW || 600,
+      worldH: cfg.worldH || 600,
+      solid: !!(cfg.solid || (opts && opts.solid)),
+      hit: false
+    };
+    seg.sprites.push(sp);
+    return sp;
+  }
+
+  /** 沿赛道两侧随机撒树 / 岩石 / 广告牌 */
+  function scatterScenery() {
+    const N = segments.length;
+    for (let n = 12; n < N - 12; n += 2) {
+      const side = Math.random() < .5 ? -1 : 1;
+      const r = Math.random();
+      let type, off;
+      if (r < .40)      { type = 'treePine';  off = side * Util.rand(1.55, 5.5); }
+      else if (r < .68) { type = 'treeRound'; off = side * Util.rand(1.60, 6.0); }
+      else if (r < .84) { type = 'rock';      off = side * Util.rand(1.35, 4.0); }
+      else if (r < .93) { type = 'bush';      off = side * Util.rand(1.30, 3.2); }
+      else              { type = 'billboard'; off = side * Util.rand(1.55, 2.1); }
+      addSprite(n, type, off);
+      // 对称侧偶尔也来一棵，形成林荫道
+      if (Math.random() < .38) {
+        addSprite(n, Math.random() < .5 ? 'treePine' : 'treeRound', -side * Util.rand(1.55, 6.0));
+      }
+    }
+  }
+
+  /** 在路面上撒可碰撞的障碍锥（只在直道段放置，避免弯中"阴人"） */
+  function scatterObstacles() {
+    const N = segments.length;
+    for (let n = 60; n < N - 60; n += 1) {
+      if (Math.abs(segments[n].curve) > 0.6) continue;
+      if (Math.random() > 0.010) continue;
+      // 一排放 1~3 个
+      const count = Util.randInt(1, 3);
+      const base = Util.rand(-0.72, 0.72);
+      for (let i = 0; i < count; i++) {
+        addSprite(n + i * 0.5 | 0, 'cone', Util.clamp(base + i * 0.26, -0.86, 0.86), { solid: true });
+      }
+    }
+  }
+
+  /** 生成迷你地图折线（对 curve 积分得到航向，再积分得到平面轨迹） */
+  function buildMinimap() {
+    const step = 3;
+    let heading = 0, x = 0, y = 0;
+    const pts = [];
+    for (let i = 0; i < segments.length; i += step) {
+      pts.push({ x: x, y: y });
+      heading += segments[i].curve * 0.0042;
+      x += Math.sin(heading);
+      y -= Math.cos(heading);
+    }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+    const sx = (maxX - minX) || 1, sy = (maxY - minY) || 1;
+    for (const p of pts) { p.nx = (p.x - minX) / sx; p.ny = (p.y - minY) / sy; }
+    return { pts: pts, step: step };
+  }
+
+  return {
+    get segments() { return segments; },
+    get length() { return length; },
+    mm: null,
+    finishStart: 4,   // 起跑/终点线所在 segment 区间
+    finishEnd: 7,
+
+    /** 构建内置测试赛道（含多段连续弯道、S 弯、起伏坡、下坡收尾） */
+    build() {
+      segments = [];
+      addStraight(L.SHORT);                       // 起跑直道
+      addLowRollingHills();                       // 缓起伏
+      addSCurves();                               // S 型连续弯
+      addCurve(L.MEDIUM, C.MEDIUM, H.LOW);        // 中速右弯 + 上坡
+      addBumps();                                 // 颠簸路面
+      addLowRollingHills();
+      addCurve(L.LONG * 2, C.MEDIUM, H.MEDIUM);   // 长右弯爬坡
+      addStraight(L.MEDIUM);
+      addHill(L.MEDIUM, H.HIGH);                  // 大上坡
+      addSCurves();
+      addCurve(L.LONG, -C.MEDIUM, H.NONE);        // 长左弯
+      addHill(L.LONG, H.HIGH);
+      addCurve(L.LONG, C.MEDIUM, -H.LOW);         // 长右弯下坡
+      addBumps();
+      addHill(L.LONG, -H.MEDIUM);
+      addStraight(L.MEDIUM);
+      addSCurves();
+      addDownhillToEnd();
+
+      // 起跑 / 终点线（绘制成黑白格）
+      for (let n = this.finishStart; n <= this.finishEnd; n++) segments[n].startLine = true;
+
+      // 起跑门（横跨赛道的龙门架）—— 特殊精灵，运行时矢量绘制
+      addSprite(this.finishEnd + 2, 'gantry', 0);
+
+      scatterScenery();
+      scatterObstacles();
+
+      length = segments.length * CFG.segmentLength;
+      this.mm = buildMinimap();
+      return this;
+    },
+
+    /** 由 z 坐标定位 segment */
+    findSegment(z) {
+      return segments[Math.floor(Util.wrap(z, length) / CFG.segmentLength) % segments.length];
+    },
+    /** 迷你地图上某 segment 的归一化坐标 */
+    mmPoint(index) {
+      const p = this.mm.pts[Math.floor(index / this.mm.step) % this.mm.pts.length];
+      return p;
+    }
+  };
+})();
+
+
+/* ==========================================================================
+ * 8. Input —— 输入处理模块（键盘 + 触控）
+ * ======================================================================== */
+const Input = (function () {
+  /* 键盘/触控与体感分两层：keyState 来自按键事件，virtual 来自 FaceControl，
+   * 合并结果输出到 state（任一来源为真即生效）。 */
+  const state = { left: false, right: false, up: false, down: false, drift: false, nitro: false, cruise: false };
+  const keyState = { left: false, right: false, up: false, down: false, drift: false, nitro: false };
+  const virtual = { left: false, right: false, up: false, down: false, drift: false, nitro: false, cruise: false };
+  const listeners = { restart: [], pause: [], teleport: [] };
+
+  function setKey(action, v) { keyState[action] = v; }
+  function mergeState() {
+    for (const k in keyState) state[k] = keyState[k] || virtual[k];
+    state.cruise = virtual.cruise;
+    return state;
+  }
+  function emit(name, payload) { (listeners[name] || []).forEach(f => f(payload)); }
+  function on(name, fn) { (listeners[name] = listeners[name] || []).push(fn); }
+
+  const KEYMAP = {
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    Space: 'drift',
+    ShiftLeft: 'nitro', ShiftRight: 'nitro',   // ★ 氮气加速
+    KeyN: 'nitro'                              // 备用键位（部分键盘 Shift 会触发输入法）
+  };
+
+  function bindKeyboard() {
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
+      const a = KEYMAP[e.code];
+      if (a) { setKey(a, true); e.preventDefault(); }
+      if (e.code === 'KeyR') emit('restart');
+      if (e.code === 'KeyP' || e.code === 'Escape') emit('pause');
+      // ★ 瞬移键：1/2/3 → 立即到第 1/2/3 名车手身后（仅主键盘数字区）
+      if (e.code === 'Digit1') emit('teleport', 1);
+      if (e.code === 'Digit2') emit('teleport', 2);
+      if (e.code === 'Digit3') emit('teleport', 3);
+      Sound.resume();
+    });
+    window.addEventListener('keyup', (e) => {
+      const a = KEYMAP[e.code];
+      if (a) { setKey(a, false); e.preventDefault(); }
+    });
+    window.addEventListener('blur', () => {
+      for (const k in state) state[k] = false;
+    });
+  }
+
+  /** 绑定触控按钮（pointer 事件，兼容鼠标/触摸/触控笔） */
+  function bindTouch(el, action) {
+    if (!el) return;
+    const down = (e) => { e.preventDefault(); setKey(action, true); el.classList.add('on'); Sound.resume(); };
+    const up = (e) => { e.preventDefault(); setKey(action, false); el.classList.remove('on'); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  return {
+    get state() { return mergeState(); },
+    virtual: virtual, on: on,
+    init() {
+      bindKeyboard();
+      bindTouch(document.getElementById('btn-left'), 'left');
+      bindTouch(document.getElementById('btn-right'), 'right');
+      bindTouch(document.getElementById('btn-gas'), 'up');
+      bindTouch(document.getElementById('btn-brake'), 'down');
+      bindTouch(document.getElementById('btn-drift'), 'drift');
+      bindTouch(document.getElementById('btn-nitro'), 'nitro');
+      if (IS_TOUCH) document.getElementById('pad').classList.remove('hidden');
+    },
+    /** 复位所有按键（切页 / 暂停时调用）；virtual 由体感循环下一帧自动重写 */
+    reset() {
+      for (const k in keyState) keyState[k] = false;
+      for (const k in virtual) virtual[k] = false;
+    }
+  };
+})();
+
+
+/* ==========================================================================
+ * 8.5 FaceControl —— 摄像头体感控制模块（体感版新增）
+ * --------------------------------------------------------------------------
+ * 原理：MediaPipe FaceLandmarker（CDN 加载）对前置摄像头画面做 478 点人脸关键
+ *      点检测，从关键点几何推导两个姿态量，映射成 Input.state 的虚拟按键：
+ *
+ *   ① 俯仰 pitch（下巴抬起 / 收下）：
+ *        ratio = (鼻尖y - 双眼中点y) / (下巴y - 双眼中点y)
+ *      抬下巴时脸部纵向透视缩短，鼻尖相对更"贴近"眼睛 → ratio 变小；
+ *      收下巴则变大。相对【校准基线】的差值超过阈值即触发加速 / 减速。
+ *   ② 侧倾 roll（歪头）：
+ *        roll = atan2(两外眼角y差, 两外眼角x差)
+ *      相对校准基线左/右歪超过死区即触发左 / 右转向（带迟滞防抖）。
+ *
+ *   控制映射：
+ *      抬下巴 → 油门      低头 → 刹车      居中 → 定速巡航（input.cruise）
+ *      歪头左 → left      歪头右 → right
+ *   人脸丢失 > 0.8s 自动进入巡航保护；C 键随时重新校准中立姿势。
+ * ======================================================================== */
+const FaceControl = (function () {
+  let enabled = false;
+  let landmarker = null, video = null, rafId = 0;
+  let canvas = null, ctx2d = null, statusEl = null;
+
+  /* ---- 校准基线 ---- */
+  let calibrating = false, calibNeed = 24, calibGot = 0;
+  let sumPitch = 0, sumRoll = 0;
+  let basePitch = null, baseRoll = 0;
+
+  /* ---- 平滑与阈值 ---- */
+  let smPitch = 0, smRoll = 0, haveSm = false;
+  const EMA = 0.38;                 // 姿态平滑系数（越小越稳但越迟钝）
+  const P_UP = 0.040, P_DOWN = 0.050, P_HYST = 0.016;   // 俯仰阈值 / 迟滞
+  const R_ON = 0.135, R_OFF = 0.100;                     // 歪头死区（弧度，约 7.7°/5.7°）
+  const latch = { up: false, down: false, left: false, right: false };
+  let lastSeen = 0, lastDetectOk = false, loopStartedAt = 0;
+
+  const CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+
+  function setStatus(text, color) {
+    if (statusEl) {
+      statusEl.textContent = text;
+      statusEl.style.color = color || '#7fe3ff';
+    }
+  }
+
+  /* ---- 单帧几何测量：返回 { pitch(相对基线), roll(相对基线, 正=右歪) } ---- */
+  function measure(lm) {
+    let eA = lm[33], eB = lm[263];                    // 两个外眼角（序号不区分左右，按图像 x 排序）
+    if (eA.x > eB.x) { const t = eA; eA = eB; eB = t; }
+    const nose = lm[1], chin = lm[152];
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+
+    const rollRaw = Math.atan2((eB.y - eA.y) * vh, (eB.x - eA.x) * vw);
+    const eyeMidY = (eA.y + eB.y) / 2;
+    const span = Math.max(1e-4, chin.y - eyeMidY);
+    const pitchRatio = (nose.y - eyeMidY) / span;     // 抬下巴 → 变小；低头 → 变大
+
+    /* 图像右侧 = 玩家左侧：歪向玩家右侧时 eA（图像左）下沉 → rollRaw < 0
+     * 取负号让"正 = 向右歪"符合直觉 */
+    return { pitch: pitchRatio - (basePitch == null ? pitchRatio : basePitch), roll: -(rollRaw - baseRoll) };
+  }
+
+  /* ---- 把姿态写进 Input.state（带迟滞的开关量） ---- */
+  function applyControl(pitch, roll) {
+    // 俯仰（带迟滞：触发与释放阈值不同，防止临界抖动）
+    if (!latch.up && pitch < -P_UP) { latch.up = true; latch.down = false; }
+    else if (latch.up && pitch > -P_UP + P_HYST) latch.up = false;
+    if (!latch.down && pitch > P_DOWN) { latch.down = true; latch.up = false; }
+    else if (latch.down && pitch < P_DOWN - P_HYST) latch.down = false;
+
+    // 侧倾
+    if (!latch.left && roll < -R_ON) { latch.left = true; latch.right = false; }
+    else if (latch.left && roll > -R_OFF) latch.left = false;
+    if (!latch.right && roll > R_ON) { latch.right = true; latch.left = false; }
+    else if (latch.right && roll < R_OFF) latch.right = false;
+
+    const s = Input.virtual;
+    s.up = latch.up; s.down = latch.down;
+    s.left = latch.left; s.right = latch.right;
+    s.cruise = !latch.up && !latch.down;              // 居中 = 定速巡航
+    // 漂移 / 氮气仍由键盘（或触控）控制，这里不动 s.drift / s.nitro
+  }
+
+  /** 人脸长时间丢失：清空方向与油门，保持巡航，避免"幽灵操作" */
+  function failSafe() {
+    latch.up = latch.down = latch.left = latch.right = false;
+    const s = Input.virtual;
+    if (enabled) { s.up = false; s.down = false; s.left = false; s.right = false; s.cruise = true; }
+  }
+
+  /* ---- 校准：采 N 帧平均作为中立基线 ---- */
+  function startCalibration() {
+    calibrating = true; calibGot = 0; sumPitch = 0; sumRoll = 0;
+    setStatus('请正视屏幕保持不动 · 校准中…', '#ffd75e');
+  }
+  function collectCalib(lm) {
+    let eA = lm[33], eB = lm[263];
+    if (eA.x > eB.x) { const t = eA; eA = eB; eB = t; }
+    const nose = lm[1], chin = lm[152];
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+    sumRoll += Math.atan2((eB.y - eA.y) * vh, (eB.x - eA.x) * vw);
+    const eyeMidY = (eA.y + eB.y) / 2;
+    sumPitch += (nose.y - eyeMidY) / Math.max(1e-4, chin.y - eyeMidY);
+    calibGot++;
+    if (calibGot >= calibNeed) {
+      basePitch = sumPitch / calibGot;
+      baseRoll = sumRoll / calibGot;
+      smPitch = 0; smRoll = 0; haveSm = false;
+      calibrating = false;
+      setStatus('体感控制中 · C 键重新校准', '#7dff9b');
+    }
+  }
+
+  /* ---- 预览小窗：镜像视频 + 姿态十字指示 + 动作高亮 ---- */
+  function draw(lm) {
+    if (!ctx2d) return;
+    const w = canvas.width, h = canvas.height;
+    ctx2d.clearRect(0, 0, w, h);
+    if (video.readyState >= 2) {
+      ctx2d.save();
+      ctx2d.translate(w, 0); ctx2d.scale(-1, 1);
+      ctx2d.drawImage(video, 0, 0, w, h);
+      ctx2d.restore();
+      ctx2d.fillStyle = 'rgba(6,12,22,.28)'; ctx2d.fillRect(0, 0, w, h);
+    }
+    const cx = w / 2, cy = h / 2;
+    // 中立区（十字死区框）
+    ctx2d.strokeStyle = 'rgba(120,220,255,.35)'; ctx2d.lineWidth = 1.5;
+    ctx2d.strokeRect(cx - 22, cy - 14, 44, 28);
+    // 姿态点：x=歪头，y=俯仰
+    let px = cx, py = cy;
+    if (lm && basePitch != null) {
+      const m = measure(lm);
+      px = Util.clamp(cx + m.roll * 150, 8, w - 8);
+      py = Util.clamp(cy + m.pitch * 320, 8, h - 8);
+    }
+    ctx2d.fillStyle = '#7fe3ff';
+    ctx2d.shadowColor = 'rgba(120,220,255,.9)'; ctx2d.shadowBlur = 8;
+    ctx2d.beginPath(); ctx2d.arc(px, py, 5, 0, Math.PI * 2); ctx2d.fill();
+    ctx2d.shadowBlur = 0;
+    // 左右箭头高亮
+    ctx2d.font = 'bold 15px monospace'; ctx2d.textBaseline = 'middle';
+    ctx2d.fillStyle = latch.left ? '#ffd75e' : 'rgba(255,255,255,.30)';
+    ctx2d.textAlign = 'left';  ctx2d.fillText('◀', 5, cy);
+    ctx2d.fillStyle = latch.right ? '#ffd75e' : 'rgba(255,255,255,.30)';
+    ctx2d.textAlign = 'right'; ctx2d.fillText('▶', w - 5, cy);
+    // 上 / 下箭头
+    ctx2d.textAlign = 'center';
+    ctx2d.fillStyle = latch.up ? '#7dff9b' : 'rgba(255,255,255,.30)';
+    ctx2d.fillText('▲', cx, 11);
+    ctx2d.fillStyle = latch.down ? '#ff9a8f' : 'rgba(255,255,255,.30)';
+    ctx2d.fillText('▼', cx, h - 11);
+  }
+
+  /* ---- 检测主循环（独立于游戏 rAF） ---- */
+  function detectLoop() {
+    rafId = requestAnimationFrame(detectLoop);
+    if (!landmarker || !video || video.readyState < 2) return;
+    let res = null;
+    try { res = landmarker.detectForVideo(video, performance.now()); } catch (e) { return; }
+    const lm = res && res.faceLandmarks && res.faceLandmarks[0];
+    draw(lm);
+
+    const now = performance.now();
+    if (!lm) {
+      /* 无脸保护：曾经见过脸 → 丢失 0.8s 后触发；
+       * 从未见脸 → 启动 1.5s 后也触发（防止玩家一直不在画面里时车不受控） */
+      const lost = lastDetectOk ? (now - lastSeen > 800) : (now - loopStartedAt > 1500);
+      if (lost) {
+        failSafe();
+        setStatus(calibrating ? '未检测到人脸 · 请正对摄像头' : '未检测到人脸 · 巡航保护中', '#ff9a8f');
+      }
+      return;
+    }
+    lastSeen = now; lastDetectOk = true;
+
+    if (calibrating) { collectCalib(lm); return; }
+    if (basePitch == null) return;
+
+    const m = measure(lm);
+    if (!haveSm) { smPitch = m.pitch; smRoll = m.roll; haveSm = true; }
+    smPitch += (m.pitch - smPitch) * EMA;
+    smRoll  += (m.roll  - smRoll ) * EMA;
+    applyControl(smPitch, smRoll);
+
+    if (!calibrating) {
+      if (latch.up) setStatus('油门 ▲', '#7dff9b');
+      else if (latch.down) setStatus('刹车 ▼', '#ff9a8f');
+      else if (latch.left) setStatus('左转 ◀', '#ffd75e');
+      else if (latch.right) setStatus('右转 ▶', '#ffd75e');
+      else setStatus('巡航 · 保持原速', '#7fe3ff');
+    }
+  }
+
+  /* ---- 启动体感：加载模型 → 开摄像头 → 校准。成功返回 true ---- */
+  async function enable() {
+    if (enabled) { startCalibration(); return true; }
+    video = document.getElementById('face-video');
+    canvas = document.getElementById('face-canvas');
+    statusEl = document.getElementById('face-status');
+    ctx2d = canvas.getContext('2d');
+    document.getElementById('facewrap').classList.remove('hidden');
+    document.getElementById('btn-calib').classList.remove('hidden');
+
+    try {
+      setStatus('正在加载人脸识别模型…');
+      const vision = await import(CDN + '/vision_bundle.mjs');
+      const fileset = await vision.FilesetResolver.forVisionTasks(CDN + '/wasm');
+      const opts = (delegate) => ({
+        baseOptions: { modelAssetPath: MODEL, delegate: delegate },
+        runningMode: 'VIDEO',
+        numFaces: 1
+      });
+      try {
+        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts('GPU'));
+      } catch (gpuErr) {
+        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, opts('CPU'));
+      }
+    } catch (err) {
+      console.warn('[FaceControl] 模型加载失败', err);
+      setStatus('模型加载失败（需联网）· 可用键盘模式', '#ff9a8f');
+      return false;
+    }
+
+    try {
+      setStatus('请求摄像头权限…');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+    } catch (err) {
+      console.warn('[FaceControl] 摄像头打开失败', err);
+      setStatus('摄像头不可用 · 可用键盘模式', '#ff9a8f');
+      return false;
+    }
+
+    enabled = true;
+    loopStartedAt = performance.now();
+    startCalibration();
+    cancelAnimationFrame(rafId);
+    detectLoop();
+    return true;
+  }
+
+  function recalibrate() { if (enabled) startCalibration(); }
+  function isEnabled() { return enabled; }
+
+  /* C 键随时重新校准 */
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyC' && enabled && !e.repeat) { startCalibration(); e.preventDefault(); }
+  });
+
+  return {
+    enable: enable, recalibrate: recalibrate, isEnabled: isEnabled,
+    /* 测试钩子：供自动化验证动作映射阈值（不影响正常游玩） */
+    _applyControl: applyControl
+  };
+})();
+
+
+/* ==========================================================================
+ * 9. Physics —— 赛车物理模块
+ * --------------------------------------------------------------------------
+ * 状态：x（横向 offset，-1..1 为路面内）、dist（累计里程，单调递增）
+ *      speed（纵向速度）、lateralVel（横向速度，用于惯性/漂移）、yaw（车身偏航）
+ * ======================================================================== */
+const Physics = (function () {
+
+  /**
+   * 氮气状态机（玩家 + AI 共用规则）
+   *  - 已点火时：即使氮气降到 0 以下也会先耗尽再退出（不会"卡在半格"）
+   *  - 未点火时：需要达到 nitroMinToFire 才能起爆
+   *  - 松开按键 / 氮气耗尽 → 立即退出并以 nitroRegen 速度回充
+   */
+  function updateNitro(car, dt, wantNitro, drainRate) {
+    const prev = car.nitroing;
+    if (wantNitro && car.nitro > 0 && (car.nitroing || car.nitro >= CFG.nitroMinToFire)) {
+      car.nitroing = true;
+    } else if (!wantNitro) {
+      car.nitroing = false;
+    }
+    car.nitroJustFired = (!prev && car.nitroing);     // 本帧刚刚点火（供音效/特效使用）
+    if (car.nitroing) {
+      car.nitro = Math.max(0, car.nitro - (drainRate || CFG.nitroDrain) * dt);
+      if (car.nitro <= 0) car.nitroing = false;         // 耗尽自动退出
+    } else {
+      car.nitro = Math.min(CFG.nitroMax, car.nitro + CFG.nitroRegen * dt);
+    }
+    // 重生期间强制熄火
+    if (car.respawn > 0) car.nitroing = false;
+  }
+
+  /** 把超出当前上限的速度平滑拉回（避免氮气结束时速度硬切） */
+  function settleSpeed(car, cap, dt) {
+    if (car.speed > cap) car.speed = Math.max(cap, car.speed - CFG.maxSpeed * 0.55 * dt);
+    car.speed = Util.clamp(car.speed, 0, CFG.maxSpeed * CFG.nitroSpeedMul);
+  }
+
+  /** 单辆车的步长积分（玩家专用；AI 用自己的简化版本） */
+  function updatePlayer(car, dt, input) {
+    const seg = Track.findSegment(car.dist);
+
+    /* ==========================================================
+     * ⓿ 重生流程：撞护栏后自动滑回赛道中央，期间玩家失去控制
+     * ======================================================== */
+    if (car.respawn > 0) {
+      car.respawn = Math.max(0, car.respawn - dt);
+      const t = 1 - (car.respawn / CFG.respawnTime);             // 0 → 1 进度
+      const ease = Util.easeOut(0, 1, Util.clamp(t, 0, 1));      // 缓出，滑回更顺滑
+      car.x += (0 - car.x) * Math.min(1, ease * 0.55 + 0.06);    // 横向插值回中心
+      car.lateralVel = 0;
+      car.steer = 0;
+      car.rumble = 0;
+      car.yaw *= 0.82;                                           // 车身回正
+      car.drifting = false;
+      car.nitroing = false;
+      car.nitroJustFired = false;                                // 重生期间不响应氮气
+      // 重生期间保持复位速度（已在撞墙瞬间压入上限），不做额外衰减，
+      // 让玩家复位后能立刻带着余速继续比赛
+      car.dist += car.speed * dt;
+      if (car.respawn === 0) car.grace = CFG.respawnGrace;       // 结束后给短暂无敌
+      return null;
+    }
+    if (car.grace > 0) car.grace = Math.max(0, car.grace - dt);
+
+    /* ==========================================================
+     * ❶ 氮气
+     * ======================================================== */
+    updateNitro(car, dt, !!input.nitro, CFG.nitroDrain);
+    const nos = car.nitroing;
+    const cap = CFG.maxSpeed * (nos ? CFG.nitroSpeedMul : 1);
+
+    const speedPct = car.speed / CFG.maxSpeed;
+    const drifting = input.drift && speedPct > 0.28;
+
+    /* ---- ❷ 纵向：油门 / 刹车 / 定速巡航 / 自然减速 ---- */
+    if (input.up) {
+      car.speed = Util.accelerate(car.speed, CFG.accel * (nos ? CFG.nitroAccelMul : 1) * (drifting ? 0.35 : 1), dt);
+    } else if (input.down) {
+      // 刹车时氮气强制熄火（刹车与氮气互斥）
+      if (nos) car.nitroing = false;
+      car.speed = Util.accelerate(car.speed, CFG.braking, dt);
+    } else if (input.cruise) {
+      /* ★ 体感模式"下巴居中"：保持当前速度（定速巡航）
+       *   唯一例外：氮气点火时允许继续提速，否则按住 Shift 也无法超越当前车速 */
+      if (nos) car.speed = Util.accelerate(car.speed, CFG.accel * CFG.nitroAccelMul * (drifting ? 0.35 : 1), dt);
+    } else {
+      car.speed = Util.accelerate(car.speed, CFG.decel * (nos ? 0.25 : 1), dt);
+    }
+    settleSpeed(car, cap, dt);
+
+    /* ---- ❸ 横向：方向盘平滑 + 抓地力响应 ---- */
+    const targetSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    car.steer += (targetSteer - car.steer) * Math.min(1, dt * CFG.steerSmooth);
+    // 低速时转向权重降低（静止时打方向不会平移）
+    const steerAuthority = Util.clamp(speedPct * 1.35, 0, 1);
+    let lateralTarget = car.steer * CFG.steerRate * steerAuthority;
+    if (drifting) lateralTarget *= CFG.driftBoost;
+    const grip = drifting ? CFG.gripDrift : CFG.gripNormal;
+    car.lateralVel += (lateralTarget - car.lateralVel) * Math.min(1, dt * grip);
+    car.x += car.lateralVel * dt;
+
+    /* ---- ❹ 离心力：弯道把车往外推 ---- */
+    // 氮气时速度百分比可 > 1 → 离心力更强，高速喷氮气过弯风险更高
+    car.x -= (dt * 2 * speedPct * seg.curve * CFG.centrifugal);
+
+    /* ---- ❺ 漂移的纵向损耗（甩尾会掉速） ---- */
+    if (drifting) {
+      car.speed = Util.accelerate(car.speed, -Math.abs(car.lateralVel) * CFG.driftScrub * CFG.maxSpeed * 0.18, dt);
+    }
+
+    /* ---- ❻ 里程推进 ---- */
+    car.speed = Util.clamp(car.speed, 0, cap);
+    car.dist += car.speed * dt;
+
+    /* ---- ❼ 边界：路肩 / 护栏 ---- */
+    let event = null;
+    const ax = Math.abs(car.x);
+    if (ax > CFG.edgeRoad) {
+      // 压路肩：抖动 + 温和掉速
+      if (car.speed > CFG.offRoadLimit) car.speed = Util.accelerate(car.speed, CFG.offRoadDecel * 0.55, dt);
+      car.rumble = 1;
+      if (ax > CFG.edgeWall && car.grace <= 0) {
+        /* ★ 撞护栏 → 立即回到赛道中央继续比赛
+         *   · 横向位置、横向速度清零（从中心重新起步）
+         *   · 保留 CFG.respawnSpeedKeep 比例的速度，并压到 respawnSpeedCap 上限
+         *   · 进入 respawn 流程：短暂失去控制 + 车身回正动画
+         *   · 之后给 respawnGrace 秒无敌，防止刚回中心又被离心力甩出去二次触发 */
+        car.speed = Math.min(car.speed * CFG.respawnSpeedKeep, CFG.maxSpeed * CFG.respawnSpeedCap);
+        car.lateralVel = 0;
+        car.steer = 0;
+        car.nitroing = false;
+        car.rumble = 0;
+        car.respawn = CFG.respawnTime;
+        car.respawnDir = Math.sign(car.x) || 1;   // 记录从哪一侧撞的，供特效使用
+        event = 'wall';
+      } else if (ax > CFG.edgeWall) {
+        // 无敌帧内：只做软夹回，不触发重生
+        car.x = Math.sign(car.x) * CFG.edgeWall;
+        car.lateralVel *= -0.3;
+      }
+    } else {
+      car.rumble = Math.max(0, car.rumble - dt * 4);
+    }
+
+    /* ---- ❽ 车身偏航（视觉）：转向量 + 横向滑移 + 弯道曲率 ---- */
+    car.yaw = Util.clamp(car.lateralVel * 3.1 + seg.curve * speedPct * 0.16, -1.25, 1.25);
+    car.drifting = drifting;
+    return event;
+  }
+
+  return { updatePlayer: updatePlayer, updateNitro: updateNitro, settleSpeed: settleSpeed };
+})();
+
+
+/* ==========================================================================
+ * 10. AI —— AI 对手模块
+ * --------------------------------------------------------------------------
+ * 每辆 AI：baseOffset（偏好走线）、skill（速度系数）、steerRate（转向能力）
+ * 行为：① 前瞻 N 段求平均曲率 → 弯前减速  ② 走内线 ③ 检测前方车辆并绕开
+ * ======================================================================== */
+const AI = (function () {
+  const LOOKAHEAD = 26;          // 前瞻段数（约 5200 世界单位）
+  const AVOID_LOOK = 14;         // 避让前瞻段数
+
+  const NAMES = ['VIPER', 'BLAZE', 'RONIN', 'FROST', 'NOVA', 'ECHO'];
+  const COLORS = [
+    { body: '#ff4d4d', top: '#ff7b6b', glass: '#2b3550', wing: '#c92f2f', name: 'VIPER' },
+    { body: '#ffd23f', top: '#ffe28a', glass: '#2b3550', wing: '#c9a51d', name: 'BLAZE' },
+    { body: '#7b5cff', top: '#a691ff', glass: '#2b3550', wing: '#5a3fd0', name: 'RONIN' },
+    { body: '#2ecc71', top: '#6ee79b', glass: '#2b3550', wing: '#1f9d55', name: 'FROST' },
+    { body: '#ff8c42', top: '#ffb27a', glass: '#2b3550', wing: '#d06a24', name: 'NOVA' },
+    { body: '#ff5fb0', top: '#ff9ad0', glass: '#2b3550', wing: '#d63d8c', name: 'ECHO' }
+  ];
+
+  /** 前瞻平均曲率（带权重：越近权重越高） */
+  function lookaheadCurve(seg, count) {
+    let sum = 0, wsum = 0;
+    const N = Track.segments.length;
+    for (let i = 1; i <= count; i++) {
+      const s = Track.segments[(seg.index + i) % N];
+      const w = 1 - (i / count) * 0.55;
+      sum += s.curve * w; wsum += w;
+    }
+    return wsum ? sum / wsum : 0;
+  }
+
+  /**
+   * 避让：若前方有更慢的车且横向接近，则向空侧偏移
+   * 返回 [-1,1] 的方向建议
+   */
+  function avoid(car, seg) {
+    const N = Track.segments.length;
+    for (let i = 1; i <= AVOID_LOOK; i++) {
+      const s = Track.segments[(seg.index + i) % N];
+      // 玩家
+      if (i <= 4 && Player.ref) {
+        const p = Player.ref;
+        const dz = p.dist - car.dist;
+        if (dz > 0 && dz < CFG.carWorldLen * 3 &&
+            Util.overlap(car.x, CFG.carOffsetW, p.x, CFG.carOffsetW, 1.5)) {
+          return (car.x > p.x) ? 1 : -1;
+        }
+      }
+      for (let j = 0; j < s.cars.length; j++) {
+        const o = s.cars[j];
+        if (o === car) continue;
+        if (Math.abs(o.dist - car.dist) > CFG.carWorldLen * 3) continue;
+        if (car.speed <= o.speed + 200) continue;
+        if (Util.overlap(car.x, CFG.carOffsetW, o.x, CFG.carOffsetW, 1.6)) {
+          return (car.x > o.x) ? 1 : (car.x < o.x ? -1 : (Math.random() < .5 ? 1 : -1));
+        }
+      }
+    }
+    return 0;
+  }
+
+  /** 更新单辆 AI（一步） */
+  function update(car, dt) {
+    const seg = Track.findSegment(car.dist);
+    const avgCurve = lookaheadCurve(seg, LOOKAHEAD);
+    const curveMag = Math.min(1, Math.abs(avgCurve) / CFG.ROAD.CURVE.HARD);
+
+    /* ① 氮气：只在"前方够直 + 氮气够多"时点火，弯中不喷（避免自己飞出赛道） */
+    if (car.nitroFire > 0) {
+      car.nitroFire -= dt;
+      car.wantNitro = car.nitro > 0;
+    } else {
+      car.wantNitro = false;
+      // 直道 + 氮气储备 > 0.55 → 以泊松式随机点火，让每辆车的节奏都不一样
+      if (curveMag < 0.14 && car.nitro > 0.55 && Math.random() < dt * 0.30 * car.aggression) {
+        car.nitroFire = Util.rand(0.9, 2.0);
+      }
+    }
+    Physics.updateNitro(car, dt, car.wantNitro, CFG.nitroDrainAI);
+    const nos = car.nitroing;
+
+    /* ② 目标速度：弯道越急，目标速度越低（弯前自动减速） */
+    const nosMul = nos ? CFG.nitroSpeedMul : 1;
+    const target = CFG.maxSpeed * car.skill * nosMul * (1 - curveMag * 0.40);
+    if (car.speed < target) car.speed = Util.accelerate(car.speed, CFG.accel * 0.92 * (nos ? CFG.nitroAccelMul * 0.6 : 1), dt);
+    else                    car.speed = Util.accelerate(car.speed, -CFG.accel * 1.5, dt);
+    Physics.settleSpeed(car, target, dt);
+    car.speed = Util.clamp(car.speed, CFG.maxSpeed * 0.22, CFG.maxSpeed * nosMul);
+
+    /* ③ 走线：沿弯道内侧 + 个体偏好 + 缓慢摆动（看起来更"活"） */
+    const wobble = Math.sin(car.dist * 0.00035 + car.phase) * 0.16;
+    let targetOffset = car.baseOffset + wobble - Math.sign(avgCurve) * Math.min(0.46, curveMag * 0.55) * car.lineBias;
+    targetOffset = Util.clamp(targetOffset, -0.94, 0.94);
+
+    /* ④ 转向：限速转舵 + 离心外推 */
+    const diff = targetOffset - car.x;
+    car.x += Util.clamp(diff, -car.steerRate * dt, car.steerRate * dt);
+
+    const av = avoid(car, seg);
+    if (av !== 0) car.x += av * car.steerRate * 1.35 * dt;
+
+    const speedPct = car.speed / CFG.maxSpeed;
+    car.x -= (dt * 2 * speedPct * seg.curve * CFG.centrifugal * 0.72);   // AI 抓地更好，外推略小
+    car.x = Util.clamp(car.x, -1.02, 1.02);
+
+    /* ⑤ 视觉偏航 */
+    const lateralNow = Util.clamp(diff * 2.2, -1, 1);
+    car.yaw = Util.clamp(lateralNow * 0.55 + seg.curve * speedPct * 0.16, -1, 1);
+
+    /* ⑥ 推进 */
+    car.dist += car.speed * dt;
+  }
+
+  /** 创建 AI 车阵 */
+  function createCars(gridBase) {
+    const cars = [];
+    const slots = [
+      { dz: 620,  off: -0.52 },
+      { dz: 620,  off:  0.52 },
+      { dz: 1180, off: -0.52 },
+      { dz: 1180, off:  0.52 },
+      { dz: 1740, off:  0.00 }
+    ];
+    for (let i = 0; i < CFG.aiCount; i++) {
+      const c = COLORS[i % COLORS.length];
+      const slot = slots[i % slots.length];
+      cars.push({
+        isAI: true,
+        name: c.name,
+        colors: c,
+        dist: gridBase + slot.dz,
+        x: slot.off,
+        z: 0,
+        speed: 0,
+        yaw: 0,
+        steer: 0,
+        lateralVel: 0,
+        rumble: 0,
+        drifting: false,
+        baseOffset: Util.rand(-0.34, 0.34),
+        skill: Util.rand(0.845, 0.975),          // 速度系数（决定强弱）
+        steerRate: Util.rand(0.85, 1.25),        // 转向能力
+        lineBias: Util.rand(0.55, 1.0),          // 走内线的积极程度
+        phase: Util.rand(0, Math.PI * 2),
+        /* —— 氮气相关 —— */
+        nitro: CFG.nitroStart * Util.rand(0.75, 1.05),   // 氮气余量
+        nitroing: false,                                  // 是否正在喷
+        nitroJustFired: false,
+        nitroFire: 0,                                     // AI 点火剩余时长
+        wantNitro: false,
+        aggression: Util.rand(0.55, 1.35),                // 喷氮气的积极程度
+        /* —— 重生相关（AI 不会撞墙出界，仅占位）—— */
+        respawn: 0, grace: 0, respawnDir: 1,
+        lap: 0, lapStart: 0, laps: [], best: null, finished: false, finishTime: null,
+        percent: 0
+      });
+    }
+    return cars;
+  }
+
+  return { update: update, createCars: createCars, lookaheadCurve: lookaheadCurve };
+})();
+
+
+/* ==========================================================================
+ * 11. Renderer —— 渲染模块（伪 3D 透视投影）
+ * ======================================================================== */
+const Renderer = (function () {
+  let canvas, ctx, W = 0, H = 0, DPR = 1;
+  let bg = { sky: 0, hillFar: 0, hillNear: 0 };
+  let bgCanvases = {};
+  let scratch, sctx;
+  const SCRATCH = 640;
+
+  /* ---------- 初始化 / 尺寸 ---------- */
+  function init(el) {
+    canvas = el;
+    ctx = canvas.getContext('2d', { alpha: false });
+    scratch = document.createElement('canvas');
+    scratch.width = scratch.height = SCRATCH;
+    sctx = scratch.getContext('2d');
+    buildBackground();
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  /* ---------- 背景：程序化生成低多边形山脉条带 ---------- */
+  function buildBackground() {
+    bgCanvases.far  = mountainStrip(1024, 190, '#93b8d8', '#7ba0c6', 9, 0.55, true);
+    bgCanvases.near = mountainStrip(1024, 150, '#4f7fa8', '#3c6890', 7, 0.85, false);
+  }
+  function mountainStrip(w, h, base, dark, peaks, jag, snow) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const step = w / peaks;
+    const pts = [];
+    for (let i = 0; i <= peaks; i++) {
+      pts.push({ x: i * step, y: h - Math.abs(Math.sin(i * 2.7 + jag * 9)) * h * (0.45 + Math.random() * 0.5) - h * 0.1 });
+    }
+    // 山体
+    g.fillStyle = base;
+    g.beginPath(); g.moveTo(0, h);
+    for (const p of pts) g.lineTo(p.x, p.y);
+    g.lineTo(w, h); g.closePath(); g.fill();
+    // 受光面（每个峰的左半边）
+    g.fillStyle = dark;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const mx = (a.x + b.x) / 2;
+      g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(mx, Math.min(a.y, b.y) + Math.abs(a.y - b.y) * 0.5); g.lineTo(mx, h); g.lineTo(a.x, h); g.closePath(); g.fill();
+      // 雪顶
+      if (snow && a.y < h * 0.42) {
+        g.fillStyle = '#eaf4fb';
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(mx, a.y + (h - a.y) * 0.22); g.lineTo(mx, a.y + (h - a.y) * 0.30); g.lineTo(a.x, a.y + (h - a.y) * 0.26); g.closePath(); g.fill();
+        g.fillStyle = dark;
+      }
+    }
+    return c;
+  }
+
+  /* ---------- 基础绘制工具 ---------- */
+  function polygon(x1, y1, x2, y2, x3, y3, x4, y4, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.lineTo(x4, y4);
+    ctx.closePath(); ctx.fill();
+  }
+  function fogRect(x, y, w, h, fog) {
+    if (fog >= 1) return;
+    ctx.globalAlpha = 1 - fog;
+    ctx.fillStyle = PALETTE.fog;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+  }
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  /* ---------- 天空 + 远山（视差） ---------- */
+  function background(curve, speedPct, dt) {
+    // 视差偏移：随弯道曲率与速度累积，产生"转弯时背景横移"的感觉
+    const d = (speedPct * dt * 60);
+    bg.sky      = Util.wrap(bg.sky      + curve * d * 0.00018, 1);
+    bg.hillFar  = Util.wrap(bg.hillFar  + curve * d * 0.00055, 1);
+    bg.hillNear = Util.wrap(bg.hillNear + curve * d * 0.00110, 1);
+
+    const horizon = H * 0.5;
+
+    // 天空渐变
+    const g = ctx.createLinearGradient(0, 0, 0, horizon + H * 0.06);
+    g.addColorStop(0, PALETTE.skyTop);
+    g.addColorStop(0.45, PALETTE.skyMid);
+    g.addColorStop(0.82, PALETTE.skyLow);
+    g.addColorStop(1, PALETTE.horizon);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, horizon + H * 0.06);
+    // 地平线以下先铺一层雾色，避免远处出现空洞
+    ctx.fillStyle = PALETTE.fog;
+    ctx.fillRect(0, horizon, W, H - horizon);
+
+    // 太阳
+    const sunX = W * (0.74 - bg.sky * 0.5), sunY = horizon - H * 0.20;
+    const sg = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, H * 0.16);
+    sg.addColorStop(0, 'rgba(255,246,201,0.95)');
+    sg.addColorStop(0.35, 'rgba(255,238,170,0.55)');
+    sg.addColorStop(1, 'rgba(255,238,170,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sunX, sunY, H * 0.16, 0, Math.PI * 2); ctx.fill();
+
+    // 两层山脉（无缝平铺，视差速度不同）
+    drawStrip(bgCanvases.far,  horizon + 1, bg.hillFar,  H * 0.30);
+    drawStrip(bgCanvases.near, horizon + 1, bg.hillNear, H * 0.22);
+  }
+  function drawStrip(img, baseY, offset, scaleH) {
+    if (!img) return;
+    const iw = img.width, ih = img.height;
+    const dw = W * 1.35, dh = scaleH;
+    let x = -offset * dw;
+    while (x > -dw) x -= dw;
+    for (; x < W; x += dw) ctx.drawImage(img, 0, 0, iw, ih, x, baseY - dh, dw, dh);
+  }
+
+  /* ---------- 路面段（由近及远绘制） ---------- */
+  function segment(seg) {
+    const p1 = seg.p1.screen, p2 = seg.p2.screen;
+    const dark = seg.color === 'DARK';
+    const grass  = dark ? PALETTE.grassD  : PALETTE.grassL;
+    const rumble = dark ? PALETTE.rumbleD : PALETTE.rumbleL;
+    const road   = dark ? PALETTE.roadD   : PALETTE.roadL;
+
+    const x1 = p1.x, y1 = p1.y, w1 = p1.w;
+    const x2 = p2.x, y2 = p2.y, w2 = p2.w;
+    const r1 = w1 / Math.max(6, 2 * CFG.lanes), r2 = w2 / Math.max(6, 2 * CFG.lanes);
+    const l1 = w1 / Math.max(32, 8 * CFG.lanes), l2 = w2 / Math.max(32, 8 * CFG.lanes);
+
+    // 草地（填满该段的屏幕横条）
+    ctx.fillStyle = grass;
+    ctx.fillRect(0, y2, W, y1 - y2);
+
+    // 红白路肩
+    polygon(x1 - w1 - r1, y1, x1 - w1, y1, x2 - w2, y2, x2 - w2 - r2, y2, rumble);
+    polygon(x1 + w1 + r1, y1, x1 + w1, y1, x2 + w2, y2, x2 + w2 + r2, y2, rumble);
+
+    // 主路面
+    polygon(x1 - w1, y1, x1 + w1, y1, x2 + w2, y2, x2 - w2, y2, road);
+
+    // 车道虚线（只在 LIGHT 段绘制 → 天然形成虚线节奏）
+    if (!dark) {
+      const lw1 = w1 * 2 / CFG.lanes, lw2 = w2 * 2 / CFG.lanes;
+      let lx1 = x1 - w1 + lw1, lx2 = x2 - w2 + lw2;
+      for (let lane = 1; lane < CFG.lanes; lx1 += lw1, lx2 += lw2, lane++) {
+        polygon(lx1 - l1 / 2, y1, lx1 + l1 / 2, y1, lx2 + l2 / 2, y2, lx2 - l2 / 2, y2, PALETTE.lane);
+      }
+    }
+
+    // 路边白实线
+    polygon(x1 - w1 + l1 * 0.6, y1, x1 - w1 + l1 * 1.6, y1, x2 - w2 + l2 * 1.6, y2, x2 - w2 + l2 * 0.6, y2, PALETTE.edgeLine);
+    polygon(x1 + w1 - l1 * 1.6, y1, x1 + w1 - l1 * 0.6, y1, x2 + w2 - l2 * 0.6, y2, x2 + w2 - l2 * 1.6, y2, PALETTE.edgeLine);
+
+    // 起点 / 终点线（黑白格）
+    if (seg.startLine) {
+      const n = 12;
+      for (let row = 0; row < 2; row++) {
+        const t0 = row * 0.5, t1 = t0 + 0.5;
+        const ry1 = Util.lerp(y1, y2, t0), ry2 = Util.lerp(y1, y2, t1);
+        const rw1 = Util.lerp(w1, w2, t0), rw2 = Util.lerp(w1, w2, t1);
+        const rx1 = Util.lerp(x1, x2, t0), rx2 = Util.lerp(x1, x2, t1);
+        for (let i = 0; i < n; i++) {
+          if ((i + row) % 2 === 0) continue;
+          const a = i / n, b = (i + 1) / n;
+          polygon(rx1 - rw1 + 2 * rw1 * a, ry1, rx1 - rw1 + 2 * rw1 * b, ry1,
+                  rx2 - rw2 + 2 * rw2 * b, ry2, rx2 - rw2 + 2 * rw2 * a, ry2, PALETTE.startB);
+        }
+      }
+    }
+
+    fogRect(0, y2, W, y1 - y2 + 1, seg.fog);
+  }
+
+  /* ---------- 护栏（由远及近绘制，避免被后续段覆盖） ---------- */
+  const RAIL_OFFSET = 1.26;    // 护栏距路中心的 offset（路半宽 1.0 之外）
+  const RAIL_H = 300;          // 护栏高度（世界单位）
+  function rails(seg) {
+    const p1 = seg.p1.screen, p2 = seg.p2.screen;
+    if (p1.scale <= 0 || p2.scale <= 0) return;
+    const hh1 = p1.scale * RAIL_H * H / 2;
+    const hh2 = p2.scale * RAIL_H * H / 2;
+    if (hh1 < 0.6) return;
+
+    const clip = seg.clip;
+    for (const side of [-1, 1]) {
+      const bx1 = p1.x + side * p1.w * RAIL_OFFSET;
+      const bx2 = p2.x + side * p2.w * RAIL_OFFSET;
+      const ty1 = Math.max(p1.y - hh1, 0);
+      const ty2 = Math.max(p2.y - hh2, 0);
+      // 被前方地形遮挡则裁剪
+      const by1 = Math.min(p1.y, clip), by2 = Math.min(p2.y, clip);
+      if (by2 >= by1) continue;
+      // 立柱（每隔一段画一根，用 LIGHT/DARK 交替制造节奏）
+      if (seg.index % 2 === 0) {
+        const wpx = Math.max(1, p1.w * 0.018);
+        polygon(bx1 - wpx, ty1, bx1 + wpx, ty1, bx2 + wpx * 0.8, by2, bx2 - wpx * 0.8, by2, PALETTE.railPost);
+      }
+      // 横梁（上下两条）
+      const bh1 = hh1 * 0.20, bh2 = hh2 * 0.20;
+      polygon(bx1, ty1 + hh1 * 0.10, bx1, ty1 + hh1 * 0.10 + bh1, bx2, ty2 + hh2 * 0.10 + bh2, bx2, ty2 + hh2 * 0.10, PALETTE.railBeam);
+      polygon(bx1, ty1 + hh1 * 0.62, bx1, ty1 + hh1 * 0.62 + bh1 * 0.7, bx2, ty2 + hh2 * 0.62 + bh2 * 0.7, bx2, ty2 + hh2 * 0.62, PALETTE.railShadow);
+    }
+  }
+
+  /* ---------- 精灵（树木 / 岩石 / 广告牌 / 锥桶 / 起跑门） ---------- */
+  function sprite(sp, seg) {
+    const p1 = seg.p1.screen, p2 = seg.p2.screen;
+    const scale = p1.scale;
+    const sx = p1.x + (scale * sp.offset * CFG.roadWidth * W / 2);
+    const sy = p1.y;
+    const dw = scale * sp.worldW * W / 2;
+    const dh = scale * sp.worldH * W / 2;
+    if (dw < 0.8 || sx + dw < -40 || sx - dw > W + 40) return;
+
+    if (sp.type === 'gantry') return gantry(seg);
+
+    const img = sp.img;
+    if (img) {
+      drawImgFogged(img, sx - dw / 2, sy - dh, dw, dh, seg.fog, seg.clip);
+    } else {
+      // 极端回退：贴图都没生成出来时，画一个色块保证画面不空
+      ctx.fillStyle = '#2f8d52';
+      ctx.fillRect(sx - dw / 2, Math.max(0, sy - dh), dw, Math.min(dh, seg.clip - (sy - dh)));
+    }
+  }
+
+  /** 带雾效的贴图绘制：离屏合成 → source-atop 覆盖雾色 → 贴回主画布 */
+  function drawImgFogged(img, dx, dy, dw, dh, fog, clipY) {
+    let visibleH = dh;
+    if (clipY != null) {
+      const hidden = Math.max(0, dy + dh - clipY);
+      visibleH = dh - hidden;
+    }
+    if (visibleH <= 0.5) return;
+
+    if (fog > 0.96 || dw > SCRATCH || visibleH > SCRATCH) {
+      ctx.drawImage(img, 0, 0, img.width, img.height * (visibleH / dh), dx, dy, dw, visibleH);
+      return;
+    }
+    const sw = Math.max(1, Math.min(SCRATCH, Math.ceil(dw)));
+    const sh = Math.max(1, Math.min(SCRATCH, Math.ceil(visibleH)));
+    sctx.clearRect(0, 0, sw, sh);
+    sctx.drawImage(img, 0, 0, img.width, img.height * (visibleH / dh), 0, 0, sw, sh);
+    sctx.globalCompositeOperation = 'source-atop';
+    sctx.globalAlpha = 1 - fog;
+    sctx.fillStyle = PALETTE.fog;
+    sctx.fillRect(0, 0, sw, sh);
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.globalAlpha = 1;
+    ctx.drawImage(scratch, 0, 0, sw, sh, dx, dy, dw, visibleH);
+  }
+
+  /** 起跑门：横跨赛道的龙门架（矢量绘制，随距离透视缩放） */
+  function gantry(seg) {
+    const p = seg.p1.screen;
+    const scale = p.scale;
+    const roadW = p.w;                       // 路面半宽（像素）
+    const postW = Math.max(2, roadW * 0.055);
+    const beamH = scale * 2100 * H / 2;      // 门楣离地高度
+    const postH = scale * 1500 * H / 2;      // 立柱高度
+    const half = roadW * 1.30;
+    const x = p.x, y = p.y;
+    if (beamH < 1.5) return;
+
+    const clip = seg.clip;
+    const bx = x - half, bx2 = x + half;
+
+    // 立柱（带明暗两面）
+    for (const s of [-1, 1]) {
+      const px = x + s * half;
+      polygon(px - postW, y, px + postW, y, px + postW * 0.82, y - postH, px - postW * 0.82, y - postH, PALETTE.railPost);
+      polygon(px - postW, y, px, y, px, y - postH, px - postW * 0.82, y - postH, '#e6edf5');
+    }
+    // 门楣
+    const beamTop = y - beamH, beamBot = y - beamH + Math.max(2, beamH * 0.30);
+    const oy = Math.min(beamTop, clip);
+    if (beamBot > oy) {
+      polygon(bx, beamBot, bx2, beamBot, bx2, oy, bx, oy, '#141a26');
+      polygon(bx, beamBot, bx2, beamBot, bx2, beamBot + (oy - beamBot) * 0.5, bx, beamBot + (oy - beamBot) * 0.5, '#ff5f8d');
+    }
+    // 文字
+    const fs = Math.max(6, (beamBot - oy) * 0.52);
+    if (fs > 7 && half > 40) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W, clip); ctx.clip();
+      ctx.font = '900 ' + fs + 'px ' + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('START / FINISH', x, (beamBot + oy) / 2);
+      ctx.restore();
+    }
+    fogRect(bx - postW, oy, (bx2 - bx) + postW * 2, beamBot - oy, seg.fog);
+  }
+
+  /* ---------- 低多边形赛车（矢量绘制，支持偏航变形与雾覆） ---------- */
+  function paintCar(c, cx, cyBase, w, colors, yaw, mono) {
+    const h = w * 0.66;
+    const top = cyBase - h;
+    const sh = yaw * w * 0.20;                     // 车头上部横移 → 伪转向
+    const F = (k, def) => mono || (colors[k] || def);
+
+    // 轮胎
+    c.fillStyle = F('tyre', '#1b1d22');
+    c.fillRect(cx - w * 0.54 + sh * 0.25, cyBase - h * 0.30, w * 0.19, h * 0.30);
+    c.fillRect(cx + w * 0.35 + sh * 0.25, cyBase - h * 0.30, w * 0.19, h * 0.30);
+
+    // 车身主体（梯形：下宽上窄）
+    c.fillStyle = F('body', '#39c9f0');
+    c.beginPath();
+    c.moveTo(cx - w * 0.50 + sh, top + h * 0.34);
+    c.lineTo(cx + w * 0.50 + sh, top + h * 0.34);
+    c.lineTo(cx + w * 0.54, cyBase);
+    c.lineTo(cx - w * 0.54, cyBase);
+    c.closePath(); c.fill();
+
+    // 顶面（引擎盖/车顶）—— 亮色面
+    c.fillStyle = F('top', '#8ff0ff');
+    c.beginPath();
+    c.moveTo(cx - w * 0.34 + sh, top + h * 0.10);
+    c.lineTo(cx + w * 0.34 + sh, top + h * 0.10);
+    c.lineTo(cx + w * 0.50 + sh, top + h * 0.34);
+    c.lineTo(cx - w * 0.50 + sh, top + h * 0.34);
+    c.closePath(); c.fill();
+
+    // 后窗
+    c.fillStyle = F('glass', '#2b3550');
+    c.beginPath();
+    c.moveTo(cx - w * 0.26 + sh, top + h * 0.20);
+    c.lineTo(cx + w * 0.26 + sh, top + h * 0.20);
+    c.lineTo(cx + w * 0.32 + sh, top + h * 0.32);
+    c.lineTo(cx - w * 0.32 + sh, top + h * 0.32);
+    c.closePath(); c.fill();
+
+    // 尾翼
+    c.fillStyle = F('wing', '#1a9fc4');
+    c.fillRect(cx - w * 0.56 + sh * 0.5, top + h * 0.00, w * 1.12, h * 0.10);
+    c.fillRect(cx - w * 0.42 + sh * 0.5, top + h * 0.10, w * 0.10, h * 0.10);
+    c.fillRect(cx + w * 0.32 + sh * 0.5, top + h * 0.10, w * 0.10, h * 0.10);
+
+    // 尾灯
+    c.fillStyle = F('lamp', '#ff3b30');
+    c.fillRect(cx - w * 0.42, cyBase - h * 0.24, w * 0.16, h * 0.09);
+    c.fillRect(cx + w * 0.26, cyBase - h * 0.24, w * 0.16, h * 0.09);
+
+    // 底部阴影条
+    c.fillStyle = F('skirt', 'rgba(0,0,0,.32)');
+    c.fillRect(cx - w * 0.54, cyBase - h * 0.06, w * 1.08, h * 0.07);
+  }
+
+  function drawCar(c, cx, cyBase, w, colors, yaw, fog) {
+    if (w < 1.5) return;
+    // 落地阴影
+    c.fillStyle = 'rgba(0,0,0,.30)';
+    c.beginPath();
+    c.ellipse(cx, cyBase, w * 0.56, w * 0.11, 0, 0, Math.PI * 2);
+    c.fill();
+    paintCar(c, cx, cyBase, w, colors, yaw, null);
+    // 远景统一覆一层雾色，使其融入环境
+    if (fog != null && fog < 0.97) {
+      c.globalAlpha = 1 - fog;
+      paintCar(c, cx, cyBase, w, colors, yaw, PALETTE.fog);
+      c.globalAlpha = 1;
+    }
+  }
+
+  /** 世界中的 AI 车 */
+  function worldCar(car, seg) {
+    const p1 = seg.p1.screen, p2 = seg.p2.screen;
+    const scale = Util.lerp(p1.scale, p2.scale, car.percent);
+    const sx = Util.lerp(p1.x, p2.x, car.percent) + (scale * car.x * CFG.roadWidth * W / 2);
+    const sy = Util.lerp(p1.y, p2.y, car.percent);
+    const w = scale * CFG.carWorldW * W / 2;
+    if (w < 1.2 || sx + w < -60 || sx - w > W + 60) return;
+    const clip = seg.clip;
+    if (sy > clip + w) return;
+
+    // 近处 AI 喷氮气 → 画一小团尾焰（远景太小不画，省性能）
+    if (car.nitroing && w > 46) {
+      ctx.save();
+      ctx.globalAlpha = seg.fog;
+      nitroFlame(sx, sy, w, car.yaw, performance.now() * 0.001, 1);
+      ctx.restore();
+    }
+
+    const img = AssetManager.get('carAI');
+    if (img && !AssetManager.isProcedural('carAI')) {
+      const dh = w * (img.height / img.width);
+      drawImgFogged(img, sx - w / 2, sy - dh, w, dh, seg.fog, clip);
+    } else {
+      drawCar(ctx, sx, sy, w, car.colors, car.yaw, seg.fog);
+    }
+  }
+
+  /** 氮气尾焰：喷口在车尾两侧，用三层同心火焰（外蓝 → 内白）模拟 */
+  function nitroFlame(cx, cyBase, w, yaw, t, intensity) {
+    const len = w * (0.34 + 0.20 * intensity) * (0.78 + Math.random() * 0.44);
+    const wide = w * 0.17 * (0.85 + Math.random() * 0.3);
+    const ex = cx - yaw * w * 0.10;
+    const ey = cyBase - w * 0.055;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const side of [-1, 1]) {
+      const ox = ex + side * w * 0.215;
+      const layers = [
+        { c: 'rgba(60,140,255,0.55)',  s: 1.00 },
+        { c: 'rgba(120,225,255,0.75)', s: 0.66 },
+        { c: 'rgba(255,255,255,0.92)', s: 0.34 }
+      ];
+      for (const L of layers) {
+        ctx.fillStyle = L.c;
+        ctx.beginPath();
+        ctx.moveTo(ox - wide * L.s, ey);
+        ctx.lineTo(ox, ey + len * L.s);
+        ctx.lineTo(ox + wide * L.s, ey);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** 玩家车（固定在画面下方，带抖动与漂移倾斜） */
+  function playerCar(car, speedPct, shakeX, shakeY) {
+    const scale = CFG.cameraDepth / CFG.playerZ;
+    const w = scale * CFG.carWorldW * W / 2;
+    const baseY = H * 0.845;
+    const bob = Math.sin(car.dist * 0.06) * (0.8 + speedPct * 2.2) + car.rumble * Util.rand(-3, 3);
+    const cx = W / 2 + car.x * 0 + shakeX;       // 玩家车恒在画面中央（摄像机跟随）
+    const cy = baseY + bob + shakeY + car.rumble * Util.rand(-1.5, 1.5);
+
+    // 漂移时车身额外倾斜
+    const yaw = Util.clamp(car.yaw + (car.drifting ? Math.sign(car.yaw) * 0.25 : 0), -1.4, 1.4);
+
+    /* ★ 重生中：车身闪烁 + 半透明，明确告诉玩家"正在被放回赛道中央" */
+    const respawning = car.respawn > 0;
+    if (respawning) {
+      ctx.save();
+      ctx.globalAlpha = (Math.floor(performance.now() / 70) % 2 === 0) ? 0.42 : 0.92;
+    }
+
+    const img = AssetManager.get('carPlayer');
+    if (img && !AssetManager.isProcedural('carPlayer')) {
+      const dh = w * (img.height / img.width);
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.drawImage(img, cx - w / 2, cy - dh, w, dh);
+      ctx.restore();
+    } else {
+      // 漂移尾烟
+      if (Math.abs(car.yaw) > 0.35 && speedPct > 0.25) {
+        ctx.fillStyle = 'rgba(220,230,240,' + (0.16 + speedPct * 0.16) + ')';
+        for (let i = 0; i < 3; i++) {
+          const r = w * Util.rand(0.10, 0.24);
+          ctx.beginPath();
+          ctx.arc(cx - Math.sign(car.yaw) * w * Util.rand(0.3, 0.72), cy - Util.rand(0, w * 0.14), r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // 氮气尾焰（画在车身之前，让车身盖住火焰根部）
+      if (car.nitroing) nitroFlame(cx, cy, w, yaw, performance.now() * 0.001, speedPct);
+      drawCar(ctx, cx, cy, w, {
+        body: '#00c8f0', top: '#8ff0ff', glass: '#101a2c', wing: '#0ea6cc',
+        lamp: '#ff4d4d', tyre: '#14161c', skirt: 'rgba(0,0,0,.34)'
+      }, yaw, 1);
+    }
+    if (respawning) ctx.restore();
+  }
+
+  /* ---------- 氮气槽 HUD ---------- */
+  function nitroGauge(car) {
+    const bw = Math.min(W * 0.34, 300);
+    const bh = Math.max(12, Math.min(W, H) * 0.022);
+    const touchGap = IS_TOUCH ? 200 : 0;      // 触控端让出按钮区
+    const x = (W - bw) / 2;
+    const y = H - bh - 18 - touchGap;
+
+    ctx.save();
+    // 底槽
+    ctx.fillStyle = 'rgba(6,12,22,.55)';
+    roundRect(ctx, x - 4, y - 4, bw + 8, bh + 8, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,220,255,.30)'; ctx.lineWidth = 2; ctx.stroke();
+
+    // 余量
+    const pct = Util.clamp(car.nitro / CFG.nitroMax, 0, 1);
+    const g = ctx.createLinearGradient(x, 0, x + bw, 0);
+    g.addColorStop(0, '#2f7bff'); g.addColorStop(0.6, '#5fe0ff'); g.addColorStop(1, '#c9f6ff');
+    ctx.fillStyle = g;
+    roundRect(ctx, x, y, Math.max(2, bw * pct), bh, 5); ctx.fill();
+
+    // 可点火刻度线
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+    const mx = x + bw * (CFG.nitroMinToFire / CFG.nitroMax);
+    ctx.beginPath(); ctx.moveTo(mx, y - 2); ctx.lineTo(mx, y + bh + 2); ctx.stroke();
+
+    // 文字
+    const ready = car.nitro >= CFG.nitroMinToFire;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '800 ' + Math.round(bh * 0.78) + 'px ' + getComputedStyle(document.body).fontFamily;
+    if (car.nitroing) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('N I T R O   B O O S T !', W / 2, y + bh / 2);
+    } else {
+      ctx.fillStyle = ready ? '#bfefff' : 'rgba(190,210,230,.75)';
+      ctx.fillText(ready ? 'NITRO READY  [SHIFT]' : 'NITRO ' + Math.round(pct * 100) + '%', W / 2, y + bh / 2);
+    }
+    ctx.restore();
+  }
+
+  /** 氮气全屏效果：屏幕边缘蓝色速度晕影 */
+  function nitroOverlay(intensity) {
+    if (intensity <= 0.01) return;
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.18,
+                                       W / 2, H / 2, Math.max(W, H) * 0.72);
+    g.addColorStop(0, 'rgba(90,200,255,0)');
+    g.addColorStop(1, 'rgba(70,170,255,' + (0.30 * intensity).toFixed(3) + ')');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ---------- 粒子（碰撞火花 / 路肩扬尘） ---------- */
+  function particles(list) {
+    for (const p of list) {
+      const a = Util.clamp(p.life / p.maxLife, 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.35 + a * 0.65), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- 速度表 ---------- */
+  function speedometer(speedPct, kmh) {
+    const r = Math.min(W, H) * 0.105;
+    const touchGap = IS_TOUCH ? 200 : 0;      // 触控端把仪表抬到按钮区上方
+    const cx = W - r - 22, cy = H - r - 22 - touchGap;
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.30;
+
+    ctx.save();
+    // 底盘
+    ctx.fillStyle = 'rgba(6,12,22,.55)';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.06, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,220,255,.30)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.06, 0, Math.PI * 2); ctx.stroke();
+
+    // 底弧
+    ctx.lineCap = 'round';
+    ctx.lineWidth = r * 0.20;
+    ctx.strokeStyle = 'rgba(255,255,255,.14)';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.82, a0, a1); ctx.stroke();
+    // 速度弧（绿 → 黄 → 红）
+    const g = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+    g.addColorStop(0, '#5ef2a0'); g.addColorStop(0.55, '#ffd75e'); g.addColorStop(1, '#ff5f5f');
+    ctx.strokeStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.82, a0, a0 + (a1 - a0) * Util.clamp(speedPct, 0, 1)); ctx.stroke();
+
+    // 刻度
+    ctx.strokeStyle = 'rgba(255,255,255,.42)'; ctx.lineWidth = Math.max(1, r * 0.03);
+    for (let i = 0; i <= 8; i++) {
+      const a = a0 + (a1 - a0) * (i / 8);
+      const c = Math.cos(a), s = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(cx + c * r * 0.66, cy + s * r * 0.66);
+      ctx.lineTo(cx + c * r * 0.74, cy + s * r * 0.74);
+      ctx.stroke();
+    }
+    // 指针
+    const a = a0 + (a1 - a0) * Util.clamp(speedPct, 0, 1);
+    ctx.strokeStyle = '#ff5f6d'; ctx.lineWidth = Math.max(2, r * 0.055);
+    ctx.beginPath(); ctx.moveTo(cx - Math.cos(a) * r * 0.12, cy - Math.sin(a) * r * 0.12);
+    ctx.lineTo(cx + Math.cos(a) * r * 0.66, cy + Math.sin(a) * r * 0.66); ctx.stroke();
+    ctx.fillStyle = '#eaf2ff';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.09, 0, Math.PI * 2); ctx.fill();
+
+    // 数字
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 ' + Math.round(r * 0.44) + 'px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(String(Math.round(kmh)), cx, cy + r * 0.46);
+    ctx.fillStyle = '#7fe3ff';
+    ctx.font = '600 ' + Math.round(r * 0.18) + 'px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('KM/H', cx, cy + r * 0.72);
+    ctx.restore();
+  }
+
+  /* ---------- 迷你地图 ---------- */
+  function minimap(player, cars) {
+    const size = Math.min(W, H) * 0.20;
+    const touchGap = IS_TOUCH ? 200 : 0;      // 触控端把迷你地图抬到按钮区上方
+    const pad = 14;
+    const x = pad, y = H - size - pad - touchGap;
+    const mm = Track.mm;
+    if (!mm) return;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,12,22,.55)';
+    roundRect(ctx, x, y, size, size, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,220,255,.30)'; ctx.lineWidth = 2; ctx.stroke();
+
+    const px = (p) => x + 10 + p.nx * (size - 20);
+    const py = (p) => y + 10 + p.ny * (size - 20);
+
+    // 赛道
+    ctx.strokeStyle = 'rgba(255,255,255,.30)';
+    ctx.lineWidth = Math.max(3, size * 0.055);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < mm.pts.length; i++) {
+      const p = mm.pts[i];
+      if (i === 0) ctx.moveTo(px(p), py(p)); else ctx.lineTo(px(p), py(p));
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,220,255,.55)';
+    ctx.lineWidth = Math.max(1, size * 0.016);
+    ctx.stroke();
+
+    // 起跑线
+    const sp = mm.pts[Math.floor(Track.finishStart / mm.step)] || mm.pts[0];
+    ctx.fillStyle = '#ffd75e';
+    ctx.fillRect(px(sp) - 2.5, py(sp) - 2.5, 5, 5);
+
+    // AI 车
+    for (const c of cars) {
+      const seg = Track.findSegment(c.dist);
+      const p = Track.mmPoint(seg.index) || mm.pts[0];
+      ctx.fillStyle = c.colors.body;
+      ctx.beginPath(); ctx.arc(px(p), py(p), Math.max(2, size * 0.032), 0, Math.PI * 2); ctx.fill();
+    }
+    // 玩家
+    const pseg = Track.findSegment(player.dist);
+    const pp = Track.mmPoint(pseg.index) || mm.pts[0];
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#00c8f0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px(pp), py(pp), Math.max(3, size * 0.045), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  return {
+    init: init, resize: resize,
+    get ctx() { return ctx; },
+    get W() { return W; }, get H() { return H; },
+    background: background, segment: segment, rails: rails, sprite: sprite,
+    worldCar: worldCar, playerCar: playerCar, particles: particles,
+    speedometer: speedometer, minimap: minimap, nitroGauge: nitroGauge, nitroOverlay: nitroOverlay,
+    clear() { ctx.fillStyle = '#0b1220'; ctx.fillRect(0, 0, W, H); },
+    polygon: polygon
+  };
+})();
+
+
+/* ==========================================================================
+ * Player —— 玩家赛车对象
+ * ======================================================================== */
+const Player = {
+  ref: null,
+  create(gridBase) {
+    return {
+      isAI: false,
+      name: 'YOU',
+      colors: { body: '#00c8f0' },
+      dist: gridBase,
+      x: 0,                 // 横向 offset（-1..1 为路面内）
+      speed: 0,
+      steer: 0,
+      lateralVel: 0,
+      yaw: 0,
+      rumble: 0,
+      drifting: false,
+      /* —— 氮气 —— */
+      nitro: CFG.nitroStart,
+      nitroing: false,
+      nitroJustFired: false,
+      /* —— 撞墙重生 —— */
+      respawn: 0,          // > 0 表示正在被放回赛道中央（此期间失去控制）
+      grace: 0,            // 重生结束后的短暂无敌，防止二次撞墙
+      respawnDir: 1,       // 撞墙时位于哪一侧（供特效使用）
+      lap: 0, lapStart: 0, laps: [], best: null, finished: false, finishTime: null,
+      percent: 0
+    };
+  }
+};
+
+
+/* ==========================================================================
+ * 12. UI —— 界面模块（HUD / 倒计时 / 结算）
+ * ======================================================================== */
+const UI = (function () {
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    lap: $('hud-lap'), pos: $('hud-pos'), time: $('hud-time'), best: $('hud-best'),
+    toast: $('toast'), cd: $('cd-text'),
+    ovStart: $('ov-start'), ovPause: $('ov-pause'), ovResult: $('ov-result'),
+    resTitle: $('res-title'), resSub: $('res-sub'), resTable: $('res-table')
+  };
+  let toastTimer = null;
+
+  return {
+    el: el,
+    setLap(cur, total) { el.lap.textContent = Math.min(cur, total) + '/' + total; },
+    setPos(p, n) {
+      el.pos.textContent = p + '/' + n;
+      el.pos.className = 'v' + (p === 1 ? ' p1' : '');
+      el.pos.classList.add('v');
+    },
+    setTime(t) { el.time.textContent = Util.fmtTime(t); },
+    setBest(t) { el.best.textContent = Util.fmtTime(t); },
+    toast(msg, dur) {
+      el.toast.textContent = msg;
+      el.toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.toast.classList.remove('show'), dur || 1600);
+    },
+    countdown(text, isGo) {
+      el.cd.textContent = text;
+      el.cd.className = '';
+      void el.cd.offsetWidth;                 // 强制重排以重启动画
+      el.cd.className = 'pop' + (isGo ? ' go' : '');
+    },
+    clearCountdown() { el.cd.textContent = ''; el.cd.className = ''; },
+    show(name) {
+      ['ovStart', 'ovPause', 'ovResult'].forEach(k => el[k].classList.add('hidden'));
+      if (name) el[name].classList.remove('hidden');
+    },
+    /** 结算界面 */
+    results(player, cars, totalLaps) {
+      const all = [player].concat(cars).slice();
+      all.sort((a, b) => {
+        if (a.finished !== b.finished) return a.finished ? -1 : 1;
+        if (a.finished && b.finished) return a.finishTime - b.finishTime;
+        return b.dist - a.dist;
+      });
+      const rank = all.indexOf(player) + 1;
+      el.resTitle.textContent = rank === 1 ? 'WINNER!' : (rank <= 3 ? 'PODIUM' : 'RACE FINISH');
+      el.resSub.textContent = '第 ' + rank + ' 名 / 共 ' + all.length + ' 车 · ' + totalLaps + ' 圈';
+
+      let html = '<tr><th>#</th><th>车手</th><th>圈</th><th>总时间</th><th>最快圈</th></tr>';
+      all.forEach((c, i) => {
+        const sw = '<span class="swatch" style="background:' + (c.isAI ? c.colors.body : '#00c8f0') + '"></span>';
+        const laps = Math.min(c.lap, totalLaps);
+        const total = c.finished ? Util.fmtTime(c.finishTime) : ('未完赛 ' + laps + '/' + totalLaps);
+        html += '<tr class="' + (c.isAI ? '' : 'me') + '">' +
+                '<td class="rank">' + (i + 1) + '</td>' +
+                '<td>' + sw + c.name + '</td>' +
+                '<td>' + laps + '</td>' +
+                '<td>' + total + '</td>' +
+                '<td>' + Util.fmtTime(c.best) + '</td></tr>';
+      });
+      el.resTable.innerHTML = html;
+      this.show('ovResult');
+    }
+  };
+})();
+
+
+/* ==========================================================================
+ * 13. Game —— 游戏状态机与主循环
+ * 状态：MENU → COUNTDOWN → RACING → FINISH（可 PAUSED）
+ * ======================================================================== */
+const Game = (function () {
+  /* ---------- 运行时状态 ---------- */
+  let state = 'MENU';
+  let player = null, cars = [], allCars = [];
+  let camZ = 0, camX = 0;                 // 摄像机（camX 有跟随延迟，制造离心感）
+  let raceTime = 0, countdown = CFG.countdown, lastCdInt = -1;
+  let shake = 0, shakeX = 0, shakeY = 0;
+  let nitroFx = 0;                        // 氮气视觉强度（0..1），用于焦距 / 速度线 / 晕影的平滑过渡
+  let warpFx = 0;                         // 瞬移特效强度（>0 时全屏闪光淡出）
+  let particles = [];
+  let gridBase = 0;
+  let lastTs = 0, accumulator = 0, rafId = 0;
+  const STEP = 1 / 60;                    // 物理固定步长
+
+  /* ---------- 初始化 ---------- */
+  function boot() {
+    Renderer.init(document.getElementById('screen'));
+    Input.init();
+    Track.build();
+
+    // 资源加载（异步、失败自动回退，不阻塞）
+    AssetManager.load(ASSET_CONFIG).then(() => {
+      // 资源到位后，把贴图重新绑定到已生成的精灵上
+      Track.segments.forEach(seg => {
+        seg.sprites.forEach(sp => { sp.img = AssetManager.get(sp.type); });
+      });
+      if (AssetManager.failed.length) {
+        console.info('[NEON DRIFT] 以下资源加载失败，已回退程序化绘制：', AssetManager.failed.join(', '));
+      }
+    });
+
+    bindUI();
+    reset();
+    state = 'MENU';
+    UI.show('ovStart');
+    // 菜单时也渲染一帧静态画面作为背景
+    lastTs = performance.now();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function bindUI() {
+    const start = () => { Sound.init(); Sound.resume(); Sound.startEngine(); startRace(); };
+    document.getElementById('btn-start').onclick = start;
+    /* ★ 体感模式：先启用摄像头 + 人脸识别（失败则不开始，玩家可退回键盘模式） */
+    document.getElementById('btn-start-face').onclick = async () => {
+      Sound.init(); Sound.resume();
+      const ok = await FaceControl.enable();
+      if (ok) start();
+    };
+    document.getElementById('btn-calib').onclick = () => FaceControl.recalibrate();
+    document.getElementById('btn-again').onclick = start;
+    document.getElementById('btn-restart').onclick = start;
+    document.getElementById('btn-quit').onclick = start;
+    document.getElementById('btn-resume').onclick = () => { if (state === 'PAUSED') resume(); };
+    document.getElementById('btn-pause').onclick = () => { state === 'PAUSED' ? resume() : pause(); };
+    document.getElementById('btn-mute').onclick = (e) => {
+      const on = Sound.toggle();
+      e.currentTarget.textContent = on ? 'SOUND 开' : 'SOUND 关';
+      if (on && state === 'RACING') Sound.startEngine();
+    };
+    Input.on('restart', () => start());
+    Input.on('pause', () => { if (state === 'RACING') pause(); else if (state === 'PAUSED') resume(); });
+    Input.on('teleport', (rank) => { if (state === 'RACING') teleportTo(rank); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'RACING') pause(); });
+  }
+
+  /* ---------- 重开一局 ---------- */
+  function reset() {
+    gridBase = CFG.playerZ;                 // 让玩家车 z 起点正好落在起跑线上
+    player = Player.create(gridBase);
+    Player.ref = player;
+    cars = AI.createCars(gridBase);
+    allCars = [player].concat(cars);
+    allCars.forEach(c => { c.lap = 0; c.lapStart = 0; c.laps = []; });
+    camZ = Util.wrap(player.dist - CFG.playerZ, Track.length);
+    camX = 0;
+    raceTime = 0; countdown = CFG.countdown; lastCdInt = -1;
+    shake = 0; nitroFx = 0; warpFx = 0; particles = [];
+    Input.reset();
+    UI.setLap(1, CFG.totalLaps);
+    UI.setPos(cars.length + 1, cars.length + 1);
+    UI.setTime(0); UI.setBest(null);
+    syncCarSegments();
+  }
+
+  function startRace() {
+    reset();
+    state = 'COUNTDOWN';
+    UI.show(null);
+    UI.clearCountdown();
+  }
+  function pause() {
+    if (state !== 'RACING' && state !== 'COUNTDOWN') return;
+    state = 'PAUSED'; Input.reset(); Sound.stopEngine(); UI.show('ovPause');
+  }
+  function resume() {
+    if (state !== 'PAUSED') return;
+    state = state === 'PAUSED' ? 'RACING' : state;   // 简化：暂停后直接进 RACING
+    UI.show(null); Sound.startEngine();
+    lastTs = performance.now();
+  }
+
+  /* ---------- 碰撞检测 ---------- */
+  /** 把每辆车登记到其所在 segment（每帧重建，便于邻段查询） */
+  function syncCarSegments() {
+    for (const seg of Track.segments) if (seg.cars.length) seg.cars.length = 0;
+    for (const c of cars) {
+      const seg = Track.findSegment(c.dist);
+      seg.cars.push(c);
+      c.percent = Util.pctRemaining(c.dist, CFG.segmentLength);
+    }
+  }
+
+  /**
+   * 玩家 vs 其它车辆 / 障碍物
+   * 算法：先做 Z 轴"粗筛"（只检查玩家所在 segment 的邻域），
+   *      再做 X 轴 AABB 重叠判定（precision = 0.8 表示允许 20% 视觉重叠再触发）
+   */
+  function collide() {
+    const N = Track.segments.length;
+    const pseg = Track.findSegment(player.dist);
+
+    // 重生中 / 瞬移后无敌期：跳过所有碰撞，避免刚复位（或刚贴到前车身后）
+    // 就被二次撞击
+    if (player.respawn > 0 || player.grace > 0) return;
+
+    /* --- 与 AI 车 --- */
+    for (let n = -4; n <= 4; n++) {
+      const seg = Track.segments[Util.wrap(pseg.index + n, N)];
+      for (const car of seg.cars) {
+        const dz = Math.abs(car.dist - player.dist);
+        if (dz > CFG.carWorldLen) continue;
+        if (!Util.overlap(player.x, CFG.carOffsetW, car.x, CFG.carOffsetW, 0.82)) continue;
+
+        // 侧面碰撞：把两车分开，快的一方掉速
+        const dir = (player.x >= car.x) ? 1 : -1;
+        const closing = Math.abs(player.speed - car.speed);
+        player.x += dir * 0.020;
+        car.x -= dir * 0.016;
+        if (player.speed > car.speed) {
+          player.speed *= 0.72; car.speed *= 1.02;
+        } else {
+          player.speed *= 0.86; car.speed *= 0.94;
+        }
+        player.lateralVel += dir * 0.55;
+        if (closing > CFG.maxSpeed * 0.06) {
+          shake = Math.min(1, shake + 0.45);
+          Sound.crash();
+          spawnParticles(Util.rand(-0.5, 0.5) * W() * 0.1, 14, '#ffd75e');
+        }
+        break;
+      }
+    }
+
+    /* --- 与障碍物（锥桶等 solid 精灵） --- */
+    for (let n = 0; n <= 3; n++) {
+      const seg = Track.segments[Util.wrap(pseg.index + n, N)];
+      for (const sp of seg.sprites) {
+        if (!sp.solid || sp.hit) continue;
+        if (!Util.overlap(player.x, CFG.carOffsetW, sp.offset, 0.14, 1.0)) continue;
+        sp.hit = true;
+        player.speed *= 0.62;
+        player.lateralVel += (player.x >= sp.offset ? 1 : -1) * 0.35;
+        shake = Math.min(1, shake + 0.5);
+        Sound.crash();
+        spawnParticles(0, 12, '#ff9a3f');
+      }
+    }
+
+    player.x = Util.clamp(player.x, -CFG.edgeWall, CFG.edgeWall);
+  }
+
+  function spawnParticles(ox, count, color) {
+    const cx = W() / 2 + ox;
+    const cy = H() * 0.84;
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: cx, y: cy,
+        vx: Util.rand(-260, 260), vy: Util.rand(-320, -40),
+        r: Util.rand(2, 7), color: color || '#ffd75e',
+        life: Util.rand(0.25, 0.6), maxLife: 0.6
+      });
+    }
+    if (particles.length > 220) particles.splice(0, particles.length - 220);
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 620 * dt;
+    }
+  }
+
+  /* ---------- 圈数 / 排名 / 计时 ---------- */
+  function updateStandings() {
+    for (const c of allCars) {
+      const lapsDone = Math.floor((c.dist - gridBase) / Track.length);
+      if (lapsDone > c.lap) {
+        const lapTime = raceTime - c.lapStart;
+        c.lapStart = raceTime;
+        c.laps.push(lapTime);
+        if (c.best == null || lapTime < c.best) c.best = lapTime;
+        c.lap = lapsDone;
+        if (!c.isAI) {
+          Sound.lap();
+          if (lapsDone >= CFG.totalLaps) {
+            c.finished = true; c.finishTime = raceTime;
+            finishRace();
+          } else {
+            UI.toast('LAP ' + (lapsDone + 1) + ' / ' + CFG.totalLaps + '  ·  ' + Util.fmtTime(lapTime)
+                     + (c.best === lapTime ? '  ★ 最快圈' : ''), 1800);
+          }
+        } else if (lapsDone >= CFG.totalLaps && !c.finished) {
+          c.finished = true; c.finishTime = raceTime;
+        }
+      }
+    }
+    // 实时排名：按累计里程排序
+    const sorted = allCars.slice().sort((a, b) => b.dist - a.dist);
+    UI.setPos(sorted.indexOf(player) + 1, allCars.length);
+    UI.setLap(Math.min(player.lap + 1, CFG.totalLaps), CFG.totalLaps);
+    UI.setBest(player.best);
+  }
+
+  function finishRace() {
+    state = 'FINISH';
+    Sound.stopEngine();
+    Input.reset();
+    UI.results(player, cars, CFG.totalLaps);
+  }
+
+  /* ---------- 瞬移：按 1/2/3 立即到当前第 1/2/3 名车手身后 ---------- */
+  function teleportTo(rank) {
+    if (player.respawn > 0) return;                    // 重生中不允许瞬移
+    if (rank < 1 || rank > allCars.length) return;
+
+    const sorted = allCars.slice().sort((a, b) => b.dist - a.dist);
+    const target = sorted[rank - 1];
+    if (!target) return;
+
+    if (!target.isAI) { UI.toast('第 ' + rank + ' 名就是你自己', 1200); return; }
+    if (target.dist <= player.dist) { UI.toast('第 ' + rank + ' 名车手在你后方', 1200); return; }
+
+    /* 落在目标车身后方 teleportGap 处，并同步速度 —— 跟车不吃尾流碰撞 */
+    player.dist = target.dist - CFG.teleportGap;
+    player.speed = Math.min(target.speed, CFG.maxSpeed);
+    player.x = target.x;                               // 与目标同线，方便立即观察/超车
+    player.lateralVel = 0;
+    player.steer = 0;
+    player.yaw = 0;
+    player.rumble = 0;
+    player.drifting = false;
+    player.nitroing = false;
+    player.grace = Math.max(player.grace, CFG.teleportGrace);
+
+    // 若瞬移跨越了起点线，校正圈数记录，避免计时错乱
+    const lapsNow = Math.max(0, Math.floor((player.dist - gridBase) / Track.length));
+    if (lapsNow > player.lap) { player.lap = lapsNow; player.lapStart = raceTime; }
+
+    shake = Math.min(1, shake + 0.35);
+    warpFx = 1;
+    Sound.warp();
+    spawnParticles(0, 10, '#aef3ff');
+    UI.toast('已到第 ' + rank + ' 名「' + target.name + '」身后', 1300);
+  }
+
+  /* ---------- 物理步进（固定步长） ---------- */
+  function step(dt) {
+    if (state === 'COUNTDOWN') {
+      countdown -= dt;
+      const ci = Math.ceil(countdown);
+      if (ci !== lastCdInt) {
+        lastCdInt = ci;
+        if (ci > 0) { UI.countdown(String(ci), false); Sound.count(); }
+      }
+      if (countdown <= 0) {
+        state = 'RACING';
+        UI.countdown('GO!', true);
+        Sound.go();
+        raceTime = 0;
+        allCars.forEach(c => { c.lapStart = 0; });
+      }
+      // 倒计时期间允许原地微调方向，但不允许前进
+      player.steer += ((Input.state.right ? 1 : 0) - (Input.state.left ? 1 : 0) - player.steer) * Math.min(1, dt * 8);
+      player.yaw = player.steer * 0.5;
+      return;
+    }
+
+    if (state !== 'RACING') return;
+
+    raceTime += dt;
+    UI.setTime(raceTime);
+
+    /* ① 玩家物理 */
+    const wasRespawning = player.respawn > 0;
+    const ev = Physics.updatePlayer(player, dt, Input.state);
+    if (ev === 'wall') {
+      /* ★ 撞护栏 → 立即回到赛道中央继续比赛 */
+      shake = Math.min(1, shake + 0.75);
+      Sound.crash();
+      Sound.respawn();
+      spawnParticles(-player.respawnDir * W() * 0.16, 16, '#ff6b5f');
+      spawnParticles(0, 10, '#ffffff');
+      UI.toast('撞墙！已回到赛道中央', 1200);
+    }
+    // 氮气点火音效（只在起爆那一帧播放）
+    if (player.nitroJustFired) Sound.nitro();
+    if (wasRespawning && player.respawn === 0) {
+      // 重生结束：给一小撮落地烟尘，提示"重新获得控制"
+      spawnParticles(0, 8, 'rgba(220,235,255,0.9)');
+    }
+    // 压路肩扬尘
+    if (player.rumble > 0.4 && Math.random() < 0.4) {
+      Sound.rumble();
+      spawnParticles(player.x * W() * 0.15, 2, 'rgba(210,220,230,0.9)');
+    }
+
+    /* ② AI */
+    for (const c of cars) AI.update(c, dt);
+
+    /* ③ 重新登记 segment + 碰撞 */
+    syncCarSegments();
+    collide();
+
+    /* ④ 摄像机（带横向跟随延迟）
+     *    氮气期间焦距缩小（视野变广）+ 摄像机后拉，制造"推背"速度感。
+     *    注意：playerZ 必须与 depth 同步缩放，否则近平面会离开屏幕底边。 */
+    nitroFx += ((player.nitroing ? 1 : 0) - nitroFx) * Math.min(1, dt * 6);
+    const depthNow = CFG.cameraDepth * (1 - (1 - CFG.nitroFov) * nitroFx);
+    const playerZNow = CFG.cameraHeight * depthNow;
+
+    const targetCamX = player.x * CFG.roadWidth;
+    camX += (targetCamX - camX) * Math.min(1, dt / Math.max(0.0001, CFG.cameraLag));
+    camZ = Util.wrap(player.dist - playerZNow, Track.length);
+
+    /* ⑤ 排名 / 计时 / 圈数 */
+    updateStandings();
+
+    /* ⑥ 震屏衰减（氮气时叠加持续微抖） */
+    shake = Math.max(0, shake - dt * 2.6);
+    warpFx = Math.max(0, warpFx - dt / CFG.teleportFx);
+    const nosShake = player.nitroing ? 1.6 + 1.4 * (player.speed / CFG.maxSpeed) : 0;
+    shakeX = Util.rand(-1, 1) * (shake * 14 + nosShake * 0.5);
+    shakeY = Util.rand(-1, 1) * (shake * 10 + nosShake);
+
+    /* ⑦ 引擎音随速变化（氮气时音调更高） */
+    Sound.setEngine(Util.clamp(player.speed / CFG.maxSpeed, 0, 1.5) * (player.nitroing ? 1.28 : 1), !!Input.state.up);
+
+    /* ⑧ 更新移动端氮气按钮的可用状态 */
+    const nb = document.getElementById('btn-nitro');
+    if (nb) nb.classList.toggle('spent', player.nitro < CFG.nitroMinToFire);
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    const W = Renderer.W, H = Renderer.H, ctx = Renderer.ctx;
+    const baseSeg = Track.findSegment(camZ);
+    const basePercent = Util.pctRemaining(camZ, CFG.segmentLength);
+    const playerSeg = Track.findSegment(player.dist);
+    const playerPercent = Util.pctRemaining(player.dist, CFG.segmentLength);
+    const playerY = Util.lerp(playerSeg.p1.world.y, playerSeg.p2.world.y, playerPercent);
+    const speedPct = Util.clamp(player.speed / CFG.maxSpeed, 0, 1.5);
+
+    /* ★ 氮气动态焦距：depth 与 playerZ 必须同步缩放，
+     *   这样近平面始终贴在屏幕底边，只有"视野变广"的观感变化。 */
+    const depthNow = CFG.cameraDepth * (1 - (1 - CFG.nitroFov) * nitroFx);
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // 天空与远山
+    Renderer.background(baseSeg.curve, speedPct, STEP);
+
+    // ---- 由近及远：绘制路面（配合 maxy 做遮挡剔除） ----
+    let maxy = H;
+    let x = 0;
+    let dx = -(baseSeg.curve * basePercent);
+    const N = Track.segments.length;
+
+    for (let n = 0; n < CFG.drawDistance; n++) {
+      const seg = Track.segments[(baseSeg.index + n) % N];
+      seg.looped = seg.index < baseSeg.index;
+      seg.fog = Util.expFog(n / CFG.drawDistance, CFG.fogDensity);
+      seg.clip = maxy;
+      seg.visible = false;
+
+      Util.project(seg.p1, camX - x,      playerY + CFG.cameraHeight, camZ - (seg.looped ? Track.length : 0), depthNow, W, H, CFG.roadWidth);
+      Util.project(seg.p2, camX - x - dx, playerY + CFG.cameraHeight, camZ - (seg.looped ? Track.length : 0), depthNow, W, H, CFG.roadWidth);
+
+      x += dx;
+      dx += seg.curve;
+
+      // 剔除：在摄像机后方 / 反向翻折 / 被前方山丘遮挡
+      if (seg.p1.camera.z <= depthNow) continue;
+      if (seg.p2.screen.y >= seg.p1.screen.y) continue;
+      if (seg.p2.screen.y >= maxy) continue;
+
+      seg.visible = true;
+      Renderer.segment(seg);
+      maxy = seg.p2.screen.y;
+    }
+
+    // ---- 由远及近：护栏 / 场景 / AI 车（保证近处覆盖远处） ----
+    for (let n = CFG.drawDistance - 1; n >= 0; n--) {
+      const seg = Track.segments[(baseSeg.index + n) % N];
+      if (!seg.visible) continue;
+      Renderer.rails(seg);
+      for (const sp of seg.sprites) Renderer.sprite(sp, seg);
+      for (const car of seg.cars) Renderer.worldCar(car, seg);
+    }
+
+    // ---- 玩家车（永远在最前） ----
+    Renderer.playerCar(player, speedPct, 0, 0);
+
+    // ---- 粒子 ----
+    Renderer.particles(particles);
+
+    /* ---- 径向速度线：速度越高越明显，氮气时变为蓝色并大幅加密 ---- */
+    const linePct = speedPct + nitroFx * 0.55;
+    if (linePct > 0.55) {
+      ctx.save();
+      const a = Util.clamp((linePct - 0.55) * 0.55, 0, 0.6);
+      ctx.strokeStyle = nitroFx > 0.05
+        ? 'rgba(150,225,255,' + a + ')'
+        : 'rgba(255,255,255,' + ((speedPct - 0.55) * 0.35) + ')';
+      ctx.lineWidth = nitroFx > 0.05 ? 2.6 : 2;
+      ctx.lineCap = 'round';
+      const cx = W / 2, cy = H * 0.5;
+      const count = 14 + Math.round(nitroFx * 26);
+      for (let i = 0; i < count; i++) {
+        const ang = (i / count) * Math.PI * 2 + performance.now() * 0.0004;
+        const r0 = Math.min(W, H) * (0.30 + Math.random() * 0.08);
+        const r1 = r0 + Math.min(W, H) * (0.10 + nitroFx * 0.10) * speedPct;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0 * 0.8);
+        ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1 * 0.8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    /* ---- 氮气全屏蓝色晕影（在震屏变换之外，避免抖动露边） ---- */
+    Renderer.nitroOverlay(nitroFx);
+
+    /* ---- 瞬移闪光：短促的全屏白青色闪白，模拟"咻"地追上 ---- */
+    if (warpFx > 0) {
+      ctx.fillStyle = 'rgba(200,245,255,' + (warpFx * 0.42).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ---- HUD 仪表（不受震屏影响） ----
+    Renderer.speedometer(speedPct, speedPct * 300);
+    Renderer.minimap(player, cars);
+    Renderer.nitroGauge(player);
+
+    /* ---- 重生提示：正在被放回赛道中央 ---- */
+    if (player.respawn > 0) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '900 ' + Math.round(Math.min(W, H) * 0.045) + 'px ' + getComputedStyle(document.body).fontFamily;
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.55 + 0.45 * Math.abs(Math.sin(performance.now() * 0.012))) + ')';
+      ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = 12;
+      ctx.fillText('RESET TO TRACK · 回到赛道中央', W / 2, H * 0.30);
+      ctx.restore();
+    }
+  }
+
+  /* ---------- 主循环（requestAnimationFrame + 固定步长累加器） ---------- */
+  function loop(ts) {
+    rafId = requestAnimationFrame(loop);
+    let dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if (!isFinite(dt) || dt < 0) dt = 0;
+    dt = Math.min(dt, 0.1);                 // 防止切后台回来后"跳帧炸物理"
+
+    if (state === 'PAUSED') { return; }
+
+    accumulator += dt;
+    let guard = 0;
+    while (accumulator >= STEP && guard < 6) { step(STEP); accumulator -= STEP; guard++; }
+    if (accumulator > STEP * 6) accumulator = 0;
+
+    updateParticles(dt);
+    render();
+  }
+
+  /* 便捷尺寸访问 */
+  function W() { return Renderer.W; }
+  function H() { return Renderer.H; }
+
+  return { boot: boot, get state() { return state; } };
+})();
+
+
+/* ==========================================================================
+ * 启动
+ * ======================================================================== */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => Game.boot());
+} else {
+  Game.boot();
+}
+
+</script>
+
+<!--
+================================================================================
+ NEON DRIFT · Web 街机赛车 —— 项目文档
+================================================================================
+
+【一、项目结构】
+  单文件交付，无需构建、无需安装任何依赖（不依赖 Phaser / Three.js / 任何库）。
+
+  index.html
+    ├─ <style>                UI 层样式（HUD / 遮罩 / 触控按钮 / 结算卡片）
+    ├─ <body>                 DOM 结构
+    │    ├─ #screen          主 Canvas（唯一渲染表面）
+    │    ├─ #hud             HUD：圈数 / 名次 / 计时 / 最快圈 / 工具按钮
+    │    ├─ #countdown       起步倒计时 3-2-1-GO!
+    │    ├─ #pad             移动端触控按钮（粗指针设备自动显示）
+    │    ├─ #ov-start        开始界面（操作说明）
+    │    ├─ #ov-pause        暂停界面
+    │    └─ #ov-result       结算界面（排名表）
+    └─ <script>              13 个模块（见下方索引）
+
+  JS 模块索引（按顺序定义，均为 IIFE / 单例，无全局污染冲突）：
+     1. Util           数学工具：插值、缓动、环形回绕、AABB 重叠、透视投影
+     2. PALETTE / CFG  调色板 + 全局可调参数（物理手感、赛道尺寸、比赛规则）
+     3. ASSET_CONFIG   ★资源配置：URL / path / base64 / procedural 四选一
+     4. Procedural     程序化生成低多边形贴图（资源缺失时的回退绘制）
+     5. AssetManager   资源加载器：三级回退，永不 reject，永不阻塞启动
+     6. Sound          WebAudio 合成音效（外部音频缺失时的回退）
+     7. Track          赛道构建：直道 / 弯道 / 坡道 / 场景 / 障碍物 / 迷你地图
+     8. Input          键盘 + 触控 + 暂停重开
+     9. Physics        玩家赛车物理（加速 / 刹车 / 转向 / 摩擦 / 惯性 / 漂移）
+    10. AI             AI 路径跟随（弯前减速 + 走内线 + 避让超车）
+    11. Renderer       伪 3D 渲染（路面 / 护栏 / 精灵 / 车辆 / 速度表 / 小地图）
+    12. UI             HUD、倒计时、结算
+    13. Game           状态机 + 主循环（rAF + 固定步长物理）
+
+【二、启动方法】
+  方式 A（推荐，零门槛）：双击 index.html，用任意现代浏览器打开即可。
+  方式 B（本地服务器，便于加载外部素材）：
+      # Windows PowerShell（无需安装 Python）
+      cd 到本文件所在目录后执行：
+      npx serve .            （需 Node.js）
+      # 或
+      python -m http.server 8000
+      然后浏览器访问 http://localhost:8000
+  方式 C（部署为公网链接）：把 index.html 上传到任意静态托管
+      （GitHub Pages / Vercel / EdgeOne Pages / CloudStudio 沙箱均可）。
+
+  浏览器要求：支持 Canvas 2D + requestAnimationFrame 的现代浏览器
+      （Chrome / Edge / Firefox / Safari / 移动端 WebView 均可）。
+
+【三、操作手册】
+  PC：
+      W 或 ↑ .............. 油门
+      S 或 ↓ .............. 刹车（可减到 0）
+      A / D 或 ← / → ...... 转向
+      空格 Space ........... 手刹漂移（高速过弯神器，会轻微掉速）
+      R ................... 重新开始
+      P 或 Esc ............ 暂停 / 继续
+  移动端：
+      左下 ◀ ▶ ............ 转向
+      右下 ▲ 油门 / ▼ 刹车
+      右下「漂移」......... 手刹漂移
+      顶部按钮 ............ 暂停 / 音效开关 / 重开
+
+  操作手册 键位补充：
+      1 / 2 / 3 ....... 瞬间移动到当前第 1 / 2 / 3 名车手身后（同线同步车速，
+                        方便练超车；目标是 AI 且在你前方时才生效）
+
+  比赛规则：
+      · 3 圈制，共 4 辆车（你 + 3 名 AI）
+      · 压上红白路肩会掉速并抖动；撞护栏会【立即回到赛道中央】继续比赛
+      · 撞到路面上的橙色锥桶会明显掉速
+      · 过弯不减速会被离心力甩到外侧，可用反打方向 + 点漂移救车
+
+  氮气 N₂O 说明：
+      · 按住 Shift（或 N，移动端 N₂O 按钮）喷射，最高速 ×1.42、加速大幅提升
+      · 氮气槽在屏幕底部中央，消耗后松手自动回充（约 13 秒回满）
+      · 槽低于 12% 无法点火；刹车 / 撞墙重生时会强制熄火
+      · 提示：直道全开收益最大；弯中喷射会被离心力甩到外侧
+
+【四、核心原理详解】
+
+  ────────────────────────────────────────────────────────────
+  4.1 伪 3D 渲染原理（Pseudo-3D Road Rendering）
+  ────────────────────────────────────────────────────────────
+  真 3D 需要逐三角形做矩阵变换 + 光栅化；伪 3D 利用"赛道是一条带状平面"
+  这一约束，把 3D 问题降维成 2D 多边形填充，性能极高（这也是 OutRun、
+  Pole Position 等 80 年代街机跑车游戏的经典做法）。
+
+  ① 赛道数据模型
+     赛道被切成 N 段（segment），每段长 200 世界单位，记录：
+        curve   —— 该段的曲率（正=右弯，负=左弯）
+        p1/p2   —— 段的首尾两点，各自带 world.y（高度）与 world.z（里程）
+     赛道本身永远是"直的"，弯道只是渲染时的视觉偏移；高度才真正写进 world.y。
+
+  ② 透视投影（Util.project）
+     对任一点 P，先转换到摄像机空间，再除 z：
+        camera.x = P.x - cameraX
+        camera.y = P.y - cameraY
+        camera.z = P.z - cameraZ
+        scale    = cameraDepth / camera.z          ← 透视核心：1/z
+        screen.x = W/2 + scale * camera.x * W/2
+        screen.y = H/2 - scale * camera.y * H/2
+        screen.w = scale * roadWidth * W/2          （路面半宽的像素值）
+     其中 cameraDepth = 1 / tan(FOV/2)，即焦距。z 越大（越远）→ scale 越小
+     → 路面越窄、越靠近地平线（H/2）。这就是"近大远小"的全部来源。
+
+  ③ 弯道是怎么画出来的（关键技巧）
+     不旋转摄像机，而是在投影时对横向坐标做【二次累积偏移】：
+        x  = 0
+        dx = -(baseSegment.curve * basePercent)     // 消除段内跳变
+        for 每一段:
+            project(p1,  cameraX - x)
+            project(p2,  cameraX - x - dx)
+            x  += dx
+            dx += segment.curve                     ← 曲率累加成位移
+     因为 dx 每帧累加曲率，偏移量随距离呈【二次增长】，屏幕上就呈现出一条
+     平滑向一侧弯曲的公路。好处：完全不需要三角函数 / 矩阵，且弯道强度天然
+     随距离增强，视觉上非常接近真实透视。
+
+  ④ 绘制顺序与遮挡剔除
+     · 由近及远画路面：维护 maxy（已绘制区域的最高点，即最小 y）。
+       若某段 p2.screen.y >= maxy，说明它被前方山丘挡住了，直接 continue。
+       每段先填一条草地横条，再画路肩梯形、路面梯形、车道虚线，最后叠雾。
+     · 由远及近画立体物件（护栏 / 树 / 车）：反向遍历，保证近处覆盖远处，
+       并用该段的 clip（= 当时记录的 maxy）裁掉被山丘遮挡的部分。
+       这就是为什么代码里有两个方向相反的循环。
+
+  ⑤ 雾效（远处淡出）
+       fog = 1 / e^((d/D)² * density)，d 为段序号、D 为总绘制段数。
+       距离越远 fog → 0，按 (1-fog) 的透明度在路段上盖一层地平线色，
+       实现"远处渐隐"并自然隐藏绘制边界。
+       精灵的雾效在离屏 canvas 上用 globalCompositeOperation='source-atop'
+       覆盖雾色后再贴回，避免矩形雾块破坏轮廓。
+
+  ────────────────────────────────────────────────────────────
+  4.2 赛车物理逻辑
+  ────────────────────────────────────────────────────────────
+  状态量：x（横向 offset，-1..1 在路面内）、speed（纵向速度）、
+          lateralVel（横向速度）、yaw（车身偏航，纯视觉）、dist（累计里程）
+
+  ① 纵向（加速 / 刹车 / 摩擦）
+       speed += accel * dt        （踩油门）
+       speed += braking * dt      （刹车，为负值且远大于 accel）
+       speed += decel * dt        （松油门时的发动机制动 + 空气阻力）
+       三者统一为 Util.accelerate(v, a, dt)，再 clamp 到 [0, maxSpeed]。
+       maxSpeed = segmentLength * 60，即一物理帧最多前进一段，
+       保证离散步长不会"穿过"一整段赛道（碰撞与定位的前提）。
+
+  ② 横向（转向 + 抓地力 + 惯性）
+       目标横向速度 = steer * steerRate * speedAuthority
+          · steer 对按键输入做一阶平滑（方向盘不会瞬间打死）
+          · speedAuthority = clamp(speedPct * 1.35, 0, 1)
+            → 静止时打方向车不会横移（真实且防止原地平移穿墙）
+       lateralVel 以"抓地力"为响应系数逼近目标值：
+          lateralVel += (target - lateralVel) * min(1, dt * grip)
+       这是惯性的来源：打舵后车不会立刻横移，松舵后也不会立刻停住。
+
+  ③ 漂移
+       按住手刹时 grip 从 9.0 降到 3.2（响应变慢 = 车尾跟不上车头），
+       同时目标横向速度 ×1.95（更容易滑出去），
+       并按 |lateralVel| 施加纵向速度损耗（甩尾掉速的代价）。
+       视觉上叠加 yaw 偏移与轮胎烟雾粒子。
+
+  ④ 离心力
+       x -= dt * 2 * speedPct * segment.curve * centrifugal
+       弯道会把车往外侧推：速度越快、弯越急，被推出去越多。
+       玩家必须反打方向才能守住走线 —— 这是街机赛车的核心手感来源。
+
+  ⑤ 边界规则
+       |x| > 1.00 → 压路肩：抖动 + 持续掉速（速度只有高于阈值才掉，
+                    避免低速时被卡死在草地上动弹不得）
+       |x| > 1.18 → 撞护栏：【立即回到赛道中央】（见 ⑥ 重生）
+
+  ⑥ 撞墙重生（回到赛道中央继续比赛）
+       撞护栏不再"夹住反弹"，而是触发一次受控的自动复位：
+         · 横向速度与方向输入清零，speed 压到 maxSpeed×0.40 并保留原速一定比例
+         · 进入 respawn 流程（约 0.55s）：玩家失去控制，
+           车辆以 easeOut 缓动自动滑回 x=0 赛道中线，车身回正、闪烁提示
+         · 复位结束后附加 0.45s 无敌帧（grace），避免刚回中线又被离心力
+           甩到另一侧护栏触发二次重生
+         · 重生期间跳过所有车 / 障碍碰撞（Game.collide 直接 return）
+         · 期间强制熄火氮气；UI 顶部提示"已回到赛道中央"
+       设计取舍：既保留"出界的代价"（掉速 + 短暂失控），
+       又避免玩家被卡在墙边反复摩擦的挫败感，节奏更街机化。
+
+  ⑦ 氮气加速 N₂O（手刹漂移之外的第二个战术资源）
+       状态：nitro 槽（0~1），点火时每秒消耗 0.34（约 3 秒喷完），
+            松开后以 0.075/s 自动回充；槽 < nitroMinToFire(0.12) 无法点火。
+       效果：
+         · 纵向：accel ×2.6、maxSpeed ×1.42（超速部分由 settleSpeed 平滑回落，
+           避免氮气结束时速度瞬间硬切）
+         · 离心力与速度百分比挂钩 → 氮气时过弯外推更猛（弯中喷射=高风险高回报）
+         · 视觉：车尾三层蓝白尾焰（离屏 'lighter' 混合）、底部 N₂O 槽 HUD、
+           FOV 轻微变广（cameraDepth ×0.92）+ 摄像机同步后拉、屏幕蓝色速度
+           晕影、径向速度线加密变蓝、轻微持续抖动
+         · 音效：点火扫频（WebAudio 合成）、引擎音调抬升 ×1.28
+       AI 也会氮气：只在"前瞻曲率够直 + 储备 > 55%"时以泊松式随机点火，
+       消耗更保守（0.24/s），并有各自 aggression（0.55~1.35）参数。
+
+  ────────────────────────────────────────────────────────────
+  4.3 碰撞检测算法
+  ────────────────────────────────────────────────────────────
+  采用【空间哈希 + 两阶段判定】：赛道 segment 本身就是天然的空间分桶。
+
+   阶段 0（分桶）：每帧清空并把每辆 AI 车登记进其所在 segment 的 cars 数组。
+   阶段 1（Z 轴粗筛）：只检查玩家所在 segment 及其前后各 4 段的邻域，
+                      把 O(n) 的全量两两比较降到 O(k)，k 为邻域内车辆数。
+   阶段 2（X 轴精判）：Util.overlap(x1, w1, x2, w2, precision)
+                      一维 AABB 重叠；precision=0.82 表示允许 18% 视觉重叠
+                      才触发，避免"擦身而过就撞停"的糟糕手感。
+
+   响应：
+     · 车 vs 车：按 dx 符号把两车横向分开；快的一方掉速更多
+                 （player.speed *= 0.72 / car.speed *= 1.02），
+                 并给玩家一个横向冲量 + 震屏 + 火花
+     · 车 vs 障碍物：锥桶标记 sp.hit 防止连续触发；速度 ×0.62
+     · 车 vs 护栏：见 4.2 ⑤
+
+  ────────────────────────────────────────────────────────────
+  4.4 AI 路径跟随实现
+  ────────────────────────────────────────────────────────────
+  每辆 AI 有个性化参数：skill（速度系数 0.845~0.975）、
+  steerRate（转向能力）、lineBias（走内线的积极度）、baseOffset（偏好走线）。
+
+   ① 弯前减速（前瞻）
+      对前方 LOOKAHEAD=26 段做加权平均曲率（越近权重越高）：
+          avgCurve = Σ(curve_i * w_i) / Σw_i
+          curveMag = min(1, |avgCurve| / CURVE.HARD)
+          targetSpeed = maxSpeed * skill * (1 - curveMag * 0.40)
+      速度以 accel 逼近 targetSpeed，低于则加速、高于则更强减速 ——
+      这就是"看到弯就松油门、出弯就全油门"的行为来源。
+
+   ② 路径跟随（走内线）
+          targetOffset = baseOffset + sin摆动 - sign(avgCurve) * 内切量 * lineBias
+      右弯（curve>0）时 sign=1，targetOffset 减小 → 往左侧（内侧）靠。
+      AI 的离心外推系数比玩家小（×0.72），代表 AI 抓地更好。
+
+   ③ 避让与超车
+      向前扫描 AVOID_LOOK=14 段，若发现同段有更慢的车且与自己横向重叠，
+      则朝远离对方的一侧转舵（转舵量 ×1.35，比跟随走线更优先）。
+      同时会对玩家做同样检测 —— 所以 AI 会主动躲开挡路的你。
+
+   ④ 圈数与排名
+      每辆车用单调递增的 dist 记录里程：
+          lap = floor((dist - gridBase) / trackLength)
+      dist 同时用于实时排名（sort by dist desc）和结算排序，
+      避免了"z 回绕导致圈数误判"的经典 bug。
+
+  ────────────────────────────────────────────────────────────
+  4.5 游戏循环机制（requestAnimationFrame + 固定步长）
+  ────────────────────────────────────────────────────────────
+      function loop(ts) {
+        rafId = requestAnimationFrame(loop);        // 每帧先排下一帧
+        let dt = (ts - lastTs) / 1000;
+        dt = min(dt, 0.1);                          // 防止切后台回来"跳帧炸物理"
+        accumulator += dt;
+        while (accumulator >= STEP && guard < 6) {  // 固定步长消化时间
+          step(STEP); accumulator -= STEP; guard++;
+        }
+        updateParticles(dt);                        // 视觉层用真实 dt
+        render();
+      }
+
+   为什么要固定步长（STEP = 1/60）？
+     · 物理（尤其是加速度积分与碰撞阈值）对 dt 敏感。若直接用可变 dt，
+       在 30fps 和 144fps 下手感完全不同，高速时还会出现"穿墙"。
+     · 固定步长保证物理完全确定性、可复现，且与刷新率解耦。
+     · guard（最多 6 次迭代）防止"死亡螺旋"：卡顿后 accumulator 越积越多，
+       每帧要跑的步数越来越多 → 更卡。超出阈值直接丢弃剩余时间。
+     · 渲染每帧只跑一次，用真实 dt 更新纯视觉元素（粒子、速度线）。
+
+   状态机：MENU → COUNTDOWN（3s，禁止前进、允许微调方向）
+           → RACING（物理 / AI / 碰撞 / 计时全开）
+           → FINISH（结算表），PAUSED 可从 COUNTDOWN / RACING 进入。
+   切后台（visibilitychange）自动暂停，回来时重置 lastTs，避免大 dt 冲击。
+
+  ────────────────────────────────────────────────────────────
+  4.6 资源策略（可配置 + 失败回退）
+  ────────────────────────────────────────────────────────────
+  所有素材集中在 ASSET_CONFIG，四种来源按优先级尝试：
+        url (http/https)  →  path (本地路径)  →  base64 (内联)  →  procedural
+  加载器保证：
+     · 所有 Promise 必定 resolve（onerror / 6 秒超时都走回退分支）
+     · 回退到 Procedural 模块程序化生成的低多边形贴图（Canvas 绘制）
+     · 车若没贴图，直接用矢量低多边形绘制（还能随转向变形，效果更好）
+     · 音效回退到 WebAudio 合成（方波提示音 / 白噪声撞击 / 锯齿波引擎）
+     · 字体回退到系统等宽字体
+  因此即使把所有 url 都填成错误的 404，游戏依然完整可玩。
+
+  替换素材示例（只改配置，不动任何逻辑）：
+      ASSET_CONFIG.images.treePine.url = 'https://cdn.example.com/pine.png';
+      ASSET_CONFIG.images.treePine.base64 = 'data:image/png;base64,iVBOR...';
+      ASSET_CONFIG.images.carPlayer.url = './assets/player_car.png';
+      ASSET_CONFIG.audio.crash.url = './assets/crash.mp3';
+      ASSET_CONFIG.fonts.url = './assets/arcade.ttf';
+  worldW / worldH 控制精灵在【世界坐标系】中的大小（与 roadWidth=2000 同尺度），
+  与图片像素无关，所以换成任意分辨率的贴图都不会破坏比例。
+
+  ────────────────────────────────────────────────────────────
+  4.7 可调参数速查（改 CFG 立即生效）
+  ────────────────────────────────────────────────────────────
+      drawDistance  绘制段数（性能 ↔ 视距，移动端自动降为 130）
+      fieldOfView   视场角，越大越"广角"，透视冲击越强
+      cameraHeight  摄像机高度，越低越贴地、速度感越强
+      fogDensity    雾浓度，越大远处越快隐入地平线
+      steerRate     转向灵敏度
+      centrifugal   离心力强度
+      driftBoost    漂移横向倍率
+      gripDrift     漂移时抓地响应（越小越滑）
+      edgeWall      护栏位置（越窄越难）
+      totalLaps     总圈数
+      aiCount       参赛 AI 数量（配合 1 名玩家 = 总参赛车数，当前为 3 → 共 4 车）
+      respawnTime   撞墙后滑回赛道中央的时长（越小复位越快）
+      respawnSpeedKeep / respawnSpeedCap  重生后保留速度 / 速度上限
+      respawnGrace  重生后的无敌时长
+      nitroDrain / nitroRegen / nitroStart  氮气消耗速度 / 回充速度 / 初始量
+      nitroSpeedMul / nitroAccelMul         氮气最高速 / 加速度倍率
+      nitroFov      氮气时的焦距缩放（<1 = 视野变广）
+      teleportGap   按 1/2/3 瞬移后与目标车的距离
+      teleportGrace 瞬移后的短暂无敌时长
+      teleportFx    瞬移闪光特效时长
+
+  ────────────────────────────────────────────────────────────
+  4.8 瞬移追车功能（按键 1 / 2 / 3）
+  ────────────────────────────────────────────────────────────
+  用于"追上前车练习超车"的比赛辅助：
+     · 每帧按累计里程 dist 实时排序，1/2/3 对应当前总排名的前 3 台车
+     · 判定守卫：目标必须是 AI 且严格在你前方（自己 / 后方车会 Toast 提示）
+     · 落地：player.dist = target.dist - teleportGap(560)，与目标同线，
+       车速同步为目标当前速度 → 贴尾不吃追尾碰撞；附 0.6s 无敌（grace）
+     · 若瞬移跨越起点线，会同步校正圈数与单圈计时起点，防止计时错乱
+     · 反馈：白青色全屏闪光（warpFx 衰减）、上扬风切音效（Sound.warp）、
+       火花粒子 + Toast"已到第 N 名「XXX」身后"
+     · 重生（respawn）进行中不允许瞬移
+================================================================================
+-->
+</body>
+</html>

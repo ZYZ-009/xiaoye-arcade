@@ -1,0 +1,147 @@
+[
+  {
+    "id": "bumper",
+    "zone": "neck",
+    "name": "脖子碰碰车",
+    "desc": "转头开车，抬下巴加速。撞了也不怕，有三层护盾兜着。",
+    "tags": [
+      [
+        "3 圈 · 约 2 分钟",
+        ""
+      ],
+      [
+        "轻松",
+        "g"
+      ],
+      [
+        "转头控制",
+        "b"
+      ]
+    ],
+    "entry": "games/bumper/index.html",
+    "cover": "cov-bumper",
+    "steps": [
+      "头往左转 → 车子左转",
+      "头往右转 → 车子右转",
+      "抬下巴 → 加速；低头 → 刹车"
+    ],
+    "author": "ZYZ-009",
+    "repo": "games/bumper"
+  },
+  {
+    "id": "drift",
+    "zone": "neck",
+    "name": "NEON DRIFT 体感版",
+    "desc": "抬下巴踩油门，歪头过弯。霓虹赛道上漂移，追的是速度。",
+    "tags": [
+      [
+        "3 圈 · 约 3 分钟",
+        ""
+      ],
+      [
+        "中等",
+        "y"
+      ],
+      [
+        "歪头转向",
+        "b"
+      ]
+    ],
+    "entry": "games/drift/index.html",
+    "cover": "cov-drift",
+    "steps": [
+      "抬下巴 → 踩油门",
+      "低头 → 刹车",
+      "歪头向左 / 向右 → 车辆转向"
+    ],
+    "author": "ZYZ-009",
+    "repo": "games/drift"
+  },
+  {
+    "id": "nose",
+    "zone": "neck",
+    "name": "你画我猜 · 鼻子版",
+    "desc": "鼻尖当画笔，在空中写字让朋友猜。5 道题，慢慢画。",
+    "tags": [
+      [
+        "5 题 · 约 4 分钟",
+        ""
+      ],
+      [
+        "安静",
+        "g"
+      ],
+      [
+        "鼻尖控制",
+        "b"
+      ]
+    ],
+    "entry": "games/nose/index.html",
+    "cover": "cov-nose",
+    "steps": [
+      "鼻尖移动 → 画笔跟着走",
+      "按住鼠标在画板上拖 → 擦掉线条",
+      "按 N → 完成这一题，下一题"
+    ],
+    "author": "ZYZ-009",
+    "repo": "games/nose"
+  },
+  {
+    "id": "knight",
+    "zone": "full",
+    "name": "骑士远征",
+    "desc": "原地起跳、蹲下钻过横梁、空中拍手二段跳。无尽跑酷。",
+    "tags": [
+      [
+        "无尽 · 约 3 分钟",
+        ""
+      ],
+      [
+        "中等",
+        "y"
+      ],
+      [
+        "全身动作",
+        "b"
+      ]
+    ],
+    "entry": "games/knight/index.html",
+    "cover": "cov-knight",
+    "steps": [
+      "原地跳起 → 骑士起跳",
+      "蹲下并保持 → 钻过横梁",
+      "空中双手拍一下 → 二段跳"
+    ],
+    "author": "ZYZ-009",
+    "repo": "games/knight"
+  },
+  {
+    "id": "voxel",
+    "zone": "full",
+    "name": "像素CSGO 体感版",
+    "desc": "身体左右倾走位，比个手枪手势就开火。方块战场，五波敌人。",
+    "tags": [
+      [
+        "5 波 · 约 5 分钟",
+        ""
+      ],
+      [
+        "较累",
+        "y"
+      ],
+      [
+        "全身 + 手势",
+        "b"
+      ]
+    ],
+    "entry": "games/voxel/index.html",
+    "cover": "cov-voxel",
+    "steps": [
+      "身体左右倾 → 左右走位",
+      "上身前倾 / 后仰 → 前进后退",
+      "右手比手枪 → 持续开火"
+    ],
+    "author": "ZYZ-009",
+    "repo": "games/voxel"
+  }
+]

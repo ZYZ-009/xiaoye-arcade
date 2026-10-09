@@ -1,0 +1,9 @@
+# 源码统一用 LF，二进制文件不做处理
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.mp4  binary

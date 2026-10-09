@@ -1,0 +1,292 @@
+/* ===== 骑士远征 · 无尽跑酷 样式 ===== */
+:root {
+  --gold: #ffd75e;
+  --gold-dark: #c9932a;
+  --parchment: #f3e2b3;
+  --ink: #2b1d0f;
+  --blood: #a3302a;
+  --panel-bg: rgba(20, 12, 34, 0.88);
+  --panel-border: rgba(255, 215, 94, 0.45);
+  --font-title: 'Georgia', 'Times New Roman', serif;
+  --font-body: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0d0717;
+  font-family: var(--font-body);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+#app {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#game {
+  display: block;
+  background: #87b5e5;
+  touch-action: none;
+}
+
+/* ===== 通用界面层 ===== */
+.screen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 30;
+  background: radial-gradient(ellipse at center, rgba(30, 18, 52, 0.55) 0%, rgba(8, 4, 16, 0.82) 100%);
+  backdrop-filter: blur(3px);
+}
+.screen.hidden { display: none; }
+
+.panel {
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 18px;
+  padding: 28px 36px;
+  text-align: center;
+  color: var(--parchment);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), inset 0 0 40px rgba(255, 215, 94, 0.06);
+  max-width: min(92vw, 460px);
+  animation: rise 0.35s ease-out;
+}
+@keyframes rise {
+  from { transform: translateY(24px) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.title {
+  font-family: var(--font-title);
+  font-size: clamp(34px, 7vw, 54px);
+  color: var(--gold);
+  text-shadow: 0 3px 0 var(--gold-dark), 0 6px 18px rgba(0, 0, 0, 0.6);
+  letter-spacing: 4px;
+}
+.subtitle {
+  font-size: 12px; letter-spacing: 5px;
+  color: #c9b98a; margin: 6px 0 2px;
+  text-transform: uppercase;
+}
+.desc { color: #e8d9b5; margin-bottom: 18px; font-size: 14px; }
+
+.btn {
+  display: block;
+  width: 100%;
+  margin: 10px auto;
+  padding: 12px 20px;
+  font-size: 17px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: linear-gradient(180deg, #ffe9a8, var(--gold) 45%, var(--gold-dark));
+  border: 2px solid #7a5a10;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5d430c, 0 8px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.06s ease, box-shadow 0.06s ease;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5d430c; }
+.btn-primary { animation: glow 1.6s ease-in-out infinite alternate; }
+@keyframes glow {
+  from { box-shadow: 0 4px 0 #5d430c, 0 0 12px rgba(255, 215, 94, 0.35); }
+  to   { box-shadow: 0 4px 0 #5d430c, 0 0 28px rgba(255, 215, 94, 0.75); }
+}
+
+.controls-hint {
+  margin: 14px 0 8px;
+  font-size: 12.5px;
+  color: #d8c9a0;
+  line-height: 1.8;
+}
+.controls-hint b { color: var(--gold); }
+
+.sound-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 8px; font-size: 14px; color: #d8c9a0; cursor: pointer;
+}
+
+/* ===== HUD ===== */
+#hud {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+#hud.hidden { display: none; }
+
+.hud-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 0;
+  pointer-events: auto;
+}
+.hud-score, .hud-coins {
+  background: rgba(20, 12, 34, 0.66);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 6px 14px;
+  color: var(--parchment);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex; align-items: baseline; gap: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+.hud-label { font-size: 11px; color: #c9b98a; font-weight: 600; }
+.hud-unit { font-size: 12px; color: #c9b98a; }
+.hud-coins .coin-ic { font-size: 16px; }
+
+.btn-icon {
+  pointer-events: auto;
+  background: rgba(20, 12, 34, 0.66);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  color: var(--gold);
+  font-size: 20px;
+  width: 44px; height: 44px;
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-icon:active { transform: scale(0.94); }
+
+#powerup-hud {
+  position: absolute;
+  top: calc(104px + env(safe-area-inset-top));
+  left: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.hud-row {
+  position: absolute;
+  top: calc(58px + env(safe-area-inset-top));
+  left: 16px;
+  display: flex; align-items: center; gap: 10px;
+  pointer-events: none;
+}
+.hud-hearts {
+  font-size: 17px;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+}
+.powerup-badge {
+  background: rgba(20, 12, 34, 0.75);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 5px 12px;
+  color: var(--gold);
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+  animation: rise 0.25s ease-out;
+}
+
+/* 超量回血（红心使血量超过上限时的 +N 标记） */
+.hp-over {
+  margin-left: 6px;
+  color: #ff5c7a;
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 0 10px rgba(255, 77, 109, 0.85);
+  animation: hpOverPulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes hpOverPulse {
+  from { opacity: 0.72; transform: scale(1); }
+  to   { opacity: 1;    transform: scale(1.14); }
+}
+
+/* ===== 触摸区 ===== */
+#touch-zone {
+  position: fixed; inset: 0;
+  z-index: 10;
+  touch-action: none;
+}
+#touch-zone.hidden { display: none; }
+#slide-hint {
+  position: fixed;
+  bottom: 18%; left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  background: rgba(20, 12, 34, 0.75);
+  border: 1px solid var(--panel-border);
+  color: var(--gold);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 15px; font-weight: 600;
+  animation: hintPulse 0.9s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+#slide-hint.hidden { display: none; }
+@keyframes hintPulse {
+  from { opacity: 0.55; transform: translateX(-50%) translateY(0); }
+  to   { opacity: 1;    transform: translateX(-50%) translateY(-6px); }
+}
+
+/* ===== 结算面板 ===== */
+.stats {
+  display: flex; justify-content: center; gap: 14px;
+  margin: 16px 0 6px;
+}
+.stat {
+  background: rgba(255, 215, 94, 0.08);
+  border: 1px solid rgba(255, 215, 94, 0.25);
+  border-radius: 12px;
+  padding: 10px 16px;
+  min-width: 92px;
+}
+.stat-label { display: block; font-size: 11px; color: #c9b98a; }
+.stat-value { display: block; font-size: 26px; font-weight: 800; color: var(--gold); }
+.stat-unit { font-size: 11px; color: #c9b98a; margin-left: 2px; }
+
+.new-record {
+  color: #7CFC9A;
+  font-weight: 800;
+  font-size: 18px;
+  margin: 8px 0;
+  letter-spacing: 2px;
+  animation: glow 1s ease-in-out infinite alternate;
+}
+.new-record.hidden { display: none; }
+
+/* ===== 加载指示 ===== */
+#loading {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #0d0717;
+  color: var(--gold);
+  font-size: 18px; letter-spacing: 3px;
+  z-index: 50;
+}
+#loading.hidden { display: none; }
+.spinner {
+  width: 42px; height: 42px;
+  border: 4px solid rgba(255, 215, 94, 0.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 横屏建议（非阻塞提示条） */
+#rotate-hint {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  background: rgba(20, 12, 34, 0.75);
+  border: 1px solid var(--panel-border);
+  color: var(--gold);
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 12px;
+  pointer-events: none;
+  animation: hintPulse 0.9s ease-in-out infinite alternate;
+}
+#rotate-hint.hidden { display: none; }
+@media (orientation: landscape) {
+  #rotate-hint { display: none !important; }
+}

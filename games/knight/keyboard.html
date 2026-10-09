@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a0f2e">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>骑士远征 · 体感版 | 摄像头动作操控</title>
+<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+
+<!-- ===== 体感版专属样式（不影响 index.html） ===== -->
+<style>
+/* 菜单：体感模式面板 */
+.motion-panel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(20, 12, 34, 0.72);
+  border: 1px solid var(--panel-border, rgba(124,111,247,0.35));
+  border-radius: 12px;
+  text-align: center;
+}
+.motion-panel .mp-title { font-size: 13px; font-weight: 600; color: var(--gold, #ffd75e); margin-bottom: 8px; }
+.motion-panel .mp-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
+.motion-panel .mp-note { font-size: 11px; color: #8b949e; line-height: 1.7; }
+.motion-panel .mp-note b { color: #7ee787; }
+.btn-motion { padding: 7px 14px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.btn-cam-on { background: #238636; color: #fff; }
+.btn-cam-on:hover { background: #2ea043; }
+.btn-calib { background: #7c6ff7; color: #fff; }
+.btn-calib:hover { background: #8b7ff8; }
+.btn-calib:disabled { background: #2a2444; color: #6b7080; cursor: not-allowed; }
+.motion-panel select { background: #11131c; color: #e6edf3; border: 1px solid #2a2444; border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+
+/* 动作指示灯（HUD 下排） */
+#motion-lights {
+  position: absolute; left: 50%; transform: translateX(-50%); top: 84px;
+  display: flex; gap: 8px; z-index: 21; pointer-events: none;
+}
+.m-light {
+  min-width: 44px; text-align: center; padding: 4px 8px; border-radius: 14px;
+  background: rgba(20, 12, 34, 0.66); border: 1px solid rgba(255,255,255,0.14);
+  color: #6b7080; font-size: 11px; font-weight: 600; transition: all 0.12s;
+}
+.m-light.on { color: #1a0f2e; border-color: transparent; }
+.m-light.on[data-k="left"] { background: #58a6ff; }
+.m-light.on[data-k="right"] { background: #58a6ff; }
+.m-light.on[data-k="jump"] { background: #ffd75e; }
+.m-light.on[data-k="slide"] { background: #76ff03; }
+.m-light.on[data-k="clap"] { background: #ff7b72; }
+
+/* 摄像头画中画（右下角） */
+#pip {
+  position: fixed; right: 14px; bottom: 14px; z-index: 30; width: 176px; height: 132px;
+  border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5); background: #000;
+}
+#pip.hidden { display: none; }
+#pip video, #pip canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#pip canvas { z-index: 2; }
+#btn-pip-close {
+  position: absolute; top: 4px; right: 4px; z-index: 3; width: 22px; height: 22px;
+  border: none; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer;
+  font-size: 12px; line-height: 1;
+}
+
+/* 校准提示浮层 */
+#calib-hint {
+  position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 40;
+  background: rgba(20, 12, 34, 0.88); border: 1px solid rgba(124,111,247,0.5);
+  color: #e6edf3; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  pointer-events: none; white-space: nowrap;
+}
+#calib-hint.hidden { display: none; }
+
+/* 教学提示条（开局顶部） */
+#tutorial {
+  position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 22;
+  background: rgba(20, 12, 34, 0.8); border: 1px solid rgba(255,215,94,0.35);
+  color: var(--parchment, #f2e8cf); padding: 7px 16px; border-radius: 18px;
+  font-size: 12px; pointer-events: none; text-align: center; line-height: 1.6; max-width: 86vw;
+}
+#tutorial.hidden { display: none; }
+#tutorial b { color: #ffd75e; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- 开始界面 -->
+  <div id="screen-menu" class="screen">
+    <div class="panel">
+      <h1 class="title">⚔️ 骑士远征 · 体感版</h1>
+      <p class="subtitle">MOTION QUEST · CAMERA CONTROLLED</p>
+      <p class="desc">身体就是手柄：挪一挪、跳一跳、蹲一蹲</p>
+      <button id="btn-play" class="btn btn-primary">开始冒险</button>
+
+      <!-- 体感模式面板 -->
+      <div class="motion-panel">
+        <div class="mp-title">🎮 体感模式</div>
+        <div class="mp-actions">
+          <button id="btn-cam" class="btn-motion btn-cam-on">开启体感</button>
+          <button id="btn-calib" class="btn-motion btn-calib" disabled>重新校准</button>
+          <select id="sel-sens">
+            <option value="0.7">迟钝</option>
+            <option value="1.0" selected>标准</option>
+            <option value="1.4">灵敏</option>
+          </select>
+        </div>
+        <div class="mp-note">
+          <b>自动向右跑</b>，身体左右不控制移动<br><b>原地跳</b> = 跳跃 · <b>蹲下</b> = 下蹲 · <b>跳起拍手</b> = 二段跳<br><span style="color:#7ee787">金币：触到 1 枚 <b>+10</b> 数值（宝石 +50）· 保命：被打到 1 血时扣 <b>2 数值</b>自动回满</span>
+        </div>
+      </div>
+
+      <div class="controls-hint">
+        <p><b>自动向右跑</b>：身体左右不控制移动，只做 <b>跳 / 蹲 / 空中击掌二段跳</b></p>
+        <p><b>键盘兜底</b>：W 跳 · 空格 二段跳 · S 下蹲（体感与键盘可混用）</p>
+        <p><b>障碍规则</b>：尖刺/木箱=跳 · 横梁/长横梁=蹲 · 天花板隧道=<b>只能蹲</b></p>
+        <p><b>❤️ 空中红心</b>：跳起来撞，随机 <b>+1/+2 血</b>，可超过 5 血（上限 10）</p>
+      </div>
+      <label class="sound-toggle"><input type="checkbox" id="chk-sound" checked> 音效</label>
+    </div>
+  </div>
+
+  <!-- 暂停界面 -->
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h2>⏸️ 暂停</h2>
+      <button id="btn-resume" class="btn btn-primary">继续</button>
+      <button id="btn-restart" class="btn">重新开始</button>
+      <button id="btn-quit" class="btn">返回主菜单</button>
+    </div>
+  </div>
+
+  <!-- 结束界面 -->
+  <div id="screen-over" class="screen hidden">
+    <div class="panel">
+      <h2>💀 挑战失败</h2>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">距离</span><span id="final-dist" class="stat-value">0</span><span class="stat-unit">米</span></div>
+        <div class="stat"><span class="stat-label">金币</span><span id="final-coins" class="stat-value">0</span><span class="stat-unit">枚</span></div>
+        <div class="stat"><span class="stat-label">最高分</span><span id="final-best" class="stat-value">0</span></div>
+      </div>
+      <div id="new-record" class="new-record hidden">🏆 新纪录！</div>
+      <button id="btn-retry" class="btn btn-primary">再来一次</button>
+      <button id="btn-menu" class="btn">返回主菜单</button>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-score">
+        <span class="hud-label">距离</span>
+        <span id="hud-dist">0</span><span class="hud-unit">m</span>
+      </div>
+      <div class="hud-coins">
+        <span class="coin-ic">🪙</span>
+        <span id="hud-coins">0</span>
+      </div>
+      <button id="btn-pause" class="btn-icon" title="暂停">⏸️</button>
+    </div>
+    <div class="hud-row">
+      <div id="hud-hearts" class="hud-hearts">❤️❤️❤️❤️❤️</div>
+    </div>
+    <div id="powerup-hud"></div>
+  </div>
+
+  <!-- 动作指示灯 -->
+  <div id="motion-lights">
+    <div class="m-light" data-k="left" id="light-left">← 左</div>
+    <div class="m-light" data-k="right" id="light-right">→ 右</div>
+    <div class="m-light" data-k="jump" id="light-jump">跳</div>
+    <div class="m-light" data-k="slide" id="light-slide">蹲</div>
+    <div class="m-light" data-k="clap" id="light-clap">拍</div>
+  </div>
+
+  <!-- 教学提示条 -->
+  <div id="tutorial"><b>自动向右跑</b>（身体左右不控制）· <b>原地跳</b> = 跳跃 · <b>蹲下</b> = 下蹲 · <b>跳起拍手</b> = 二段跳 · 被打到 1 血自动扣 2 数值回满（触到金币 +10）<br>暂停 / 开始 / 重开全部用鼠标按钮</div>
+
+  <!-- 移动端触摸区 -->
+  <div id="touch-zone" class="hidden"></div>
+  <div id="slide-hint" class="hidden">⬇️ 按住 S 下蹲</div>
+  <div id="rotate-hint" class="hidden">🔄 横屏体验更佳</div>
+
+  <!-- 校准提示 + 摄像头画中画 -->
+  <div id="calib-hint" class="hidden"></div>
+  <div id="pip" class="hidden">
+    <video id="pip-video" playsinline autoplay muted></video>
+    <canvas id="pip-canvas"></canvas>
+    <button id="btn-pip-close" title="隐藏摄像头画面">✕</button>
+  </div>
+</div>
+
+<script src="js/audio.js?v=8"></script>
+<script src="js/input.js?v=8"></script>
+<script src="js/sprites.js?v=8"></script>
+<script src="js/player.js?v=8"></script>
+<script src="js/obstacles.js?v=8"></script>
+<script src="js/collectibles.js?v=8"></script>
+<script src="js/background.js?v=8"></script>
+<script src="js/particles.js?v=8"></script>
+<script src="js/ui.js?v=8"></script>
+<!-- MediaPipe 双模型（体感） -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+<!-- 体感输入层 -->
+<script src="js/motion.js?v=8"></script>
+<script src="js/game.js?v=8"></script>
+<script>
+// 教学提示条：页面加载 15 秒后自动隐藏
+window.addEventListener('DOMContentLoaded', () => {
+  // 体感版：暂停/开始/重开只用鼠标按钮 —— 关闭键盘 P/Esc 与握拳手势的暂停触发
+  if (typeof Input !== 'undefined' && Input.setKeyboardPause) Input.setKeyboardPause(false);
+  const t = document.getElementById('tutorial');
+  if (t) setTimeout(() => t.classList.add('hidden'), 15000);
+});
+</script>
+</body>
+</html>

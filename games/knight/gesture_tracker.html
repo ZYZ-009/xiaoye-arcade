@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手势交互可视化 - 双模型(Pose+Hands)</title>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif; background:#08080d; color:#e6edf3; width:100vw; height:100vh; overflow:hidden; display:flex; }
+.left-panel { width:50%; height:100vh; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.panel-card { width:86%; max-width:460px; background:#11131c; border:1px solid #1e2130; border-radius:20px; padding:44px 38px 36px; box-shadow:0 12px 48px rgba(0,0,0,0.5); display:flex; flex-direction:column; align-items:center; gap:26px; }
+.panel-card .title { font-size:1.5rem; font-weight:700; text-align:center; background:linear-gradient(135deg,#b388ff,#7c6ff7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1.35; }
+.panel-card .subtitle { font-size:0.76rem; color:#6b7080; text-align:center; margin-top:-16px; }
+.hint-area { width:100%; background:#0d0f16; border:1px solid #1a1d2a; border-radius:12px; padding:22px 18px; display:flex; flex-direction:column; gap:8px; text-align:center; }
+.hint-area .warn-title { color:#f0883e; font-size:0.92rem; font-weight:600; }
+.hint-area .warn-desc { color:#8b949e; font-size:0.76rem; }
+.hint-area .solve-title { color:#e6edf3; font-size:0.85rem; font-weight:600; margin-top:4px; }
+.hint-area .solve-step { color:#8b949e; font-size:0.74rem; line-height:1.9; text-align:left; padding-left:4px; }
+.hint-area .solve-step code { background:#1a1d2a; color:#7ee787; padding:2px 7px; border-radius:4px; font-size:0.72rem; font-family:'SF Mono',Consolas,monospace; }
+.btn-group { display:flex; gap:10px; align-items:center; justify-content:center; width:100%; }
+.btn { padding:10px 26px; border:none; border-radius:10px; font-size:0.84rem; font-weight:600; cursor:pointer; transition:all 0.2s; outline:none; }
+.btn-start { background:#238636; color:#fff; }
+.btn-start:hover { background:#2ea043; }
+.btn-start:disabled { background:#1a1d2a; color:#484f58; cursor:not-allowed; }
+.btn-stop { background:#2a1c1c; color:#8b949e; }
+.btn-stop:hover { background:#3a2020; color:#e6edf3; }
+.btn-stop:disabled { background:#1a1d2a; color:#484f58; cursor:not-allowed; }
+.status-text { font-size:0.74rem; color:#f0883e; min-width:36px; text-align:center; }
+.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; background:#484f58; }
+.status-dot.on { background:#3fb950; box-shadow:0 0 8px rgba(63,185,80,0.6); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+
+.right-panel { width:50%; height:100vh; flex-shrink:0; position:relative; background:#0a0b10; border-left:1px solid #1e2130; border-radius:20px 0 0 20px; overflow:hidden; }
+.placeholder-center { position:absolute; inset:0; z-index:1; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+.placeholder-center svg { width:72px; height:72px; opacity:0.18; }
+video, canvas { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; }
+video { z-index:2; }
+canvas { z-index:3; }
+.info-panel { position:absolute; top:12px; left:12px; z-index:4; background:rgba(0,0,0,0.78); backdrop-filter:blur(10px); border-radius:10px; padding:10px 14px; font-size:0.72rem; line-height:1.7; color:#e6edf3; min-width:200px; max-width:280px; border:1px solid rgba(255,255,255,0.06); pointer-events:none; transition:opacity 0.3s; }
+.info-panel.hidden { opacity:0; }
+.info-panel .hand-label { font-weight:600; font-size:0.8rem; margin-bottom:2px; color:#58a6ff; }
+.info-panel .gesture-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-weight:600; font-size:0.68rem; margin-top:2px; }
+.gesture-open { background:rgba(63,185,80,0.22); color:#7ee787; }
+.gesture-fist { background:rgba(248,81,73,0.22); color:#ff7b72; }
+.avatar-icon { position:absolute; bottom:24px; right:24px; z-index:5; width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#7c6ff7,#b388ff); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(124,111,247,0.35); cursor:default; }
+.avatar-icon svg { width:20px; height:20px; fill:none; stroke:#fff; stroke-width:1.8; }
+
+@media (max-width:800px) {
+  body { flex-direction:column; overflow-y:auto; }
+  .left-panel, .right-panel { width:100%; height:auto; min-height:50vh; }
+  .right-panel { border-radius:0; border-left:none; border-top:1px solid #1e2130; }
+  .panel-card { padding:24px 20px 20px; gap:16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="left-panel"><div class="panel-card">
+  <div class="title">手势交互可视化</div>
+  <div class="subtitle">Pose + Hands 双模型 · 手部21点 + 手臂骨架 · 双手识别</div>
+  <div class="hint-area" id="hintArea">
+    <div class="warn-title">当前以 file:// 协议打开</div>
+    <div class="warn-desc">浏览器安全策略禁止 file:// 下访问摄像头</div>
+    <div class="solve-title">解决方法：</div>
+    <div class="solve-step">
+      1. 打开终端，进入文件所在目录<br>
+      2. 运行 <code>python -m http.server 8080</code><br>
+      3. 浏览器访问 <code>http://localhost:8080/gesture_tracker.html</code>
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-start" id="btnStart"><span class="status-dot" id="statusDot"></span>开启摄像头</button>
+    <button class="btn btn-stop" id="btnStop" disabled>关闭摄像头</button>
+    <span class="status-text" id="statusText">就绪</span>
+  </div>
+</div></div>
+
+<div class="right-panel" id="rightPanel">
+  <div class="placeholder-center" id="placeholder">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#6b7080" stroke-width="1.4">
+      <path d="M15 10l4.5-4.5M19.5 14.5V5.5A2.5 2.5 0 0017 3H7a2.5 2.5 0 00-2.5 2.5v9A2.5 2.5 0 007 17h4.5"/>
+      <circle cx="12" cy="14" r="6"/><path d="M12 11v3M12 17h.01"/>
+    </svg>
+  </div>
+  <video id="videoElement" playsinline autoplay muted></video>
+  <canvas id="canvasElement"></canvas>
+  <div class="info-panel hidden" id="infoPanel"></div>
+  <div class="avatar-icon">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4.42 3.58-8 8-8s8 3.58 8 8"/></svg>
+ </div>
+</div>
+
+<script>(function(){if(window.location.protocol!=="file:"){document.addEventListener("DOMContentLoaded",()=>{const h=document.getElementById("hintArea");if(h)h.style.display="none";});}})();</script>
+
+<!-- ========== 双模型CDN：Pose(手臂骨架) + Hands(手指细节) ========== -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+
+<script>
+const Hands = window.Hands;
+const Pose  = window.Pose;
+
+const hintArea     = document.getElementById("hintArea");
+const placeholder  = document.getElementById("placeholder");
+const videoElement = document.getElementById("videoElement");
+const canvasElement = document.getElementById("canvasElement");
+const ctx          = canvasElement.getContext("2d");
+const infoPanel    = document.getElementById("infoPanel");
+const btnStart     = document.getElementById("btnStart");
+const btnStop      = document.getElementById("btnStop");
+const statusDot    = document.getElementById("statusDot");
+const statusText   = document.getElementById("statusText");
+
+let mediaStream = null, isRunning = false, animationId = null;
+let handsInstance = null, poseInstance = null;
+let lastHandsResults = null, lastPoseResults = null;
+let handsBusy = false, poseBusy = false;
+
+/* ==================== 手部骨架连线 ==================== */
+const HAND_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17],[0,17]
+];
+const FINGER_COLORS = {
+  thumb:{line:"#4CAF50",dot:"#81C784"}, index:{line:"#2196F3",dot:"#64B5F6"},
+  middle:{line:"#FFEB3B",dot:"#FFF176"}, ring:{line:"#FF9800",dot:"#FFB74D"},
+  pinky:{line:"#9C27B0",dot:"#CE93D8"}, palm:{line:"#FFFFFF",dot:"#FFFFFF"}
+};
+
+/* ==================== 手臂骨架连线（Pose 33点） ==================== */
+// 11=左肩 12=右肩 13=左肘 14=右肘 15=左腕 16=右腕
+const ARM_CONNECTIONS = [[11,13],[13,15],[12,14],[14,16]];
+const SHOULDER_LINE   = [11,12]; // 肩膀横线
+const ARM_COLOR       = "#00e5ff"; // 亮青色
+const ARM_JOINT_COLOR = "#00b8d4";
+const SHOULDER_COLOR  = "#18ffff";
+
+/* ==================== 下半身骨架连线 ==================== */
+// 23=左髋 24=右髋 25=左膝 26=右膝 27=左踝 28=右踝
+const LOWER_CONNECTIONS = [
+  [11,23],[12,24],        // 躯干：肩→髋
+  [23,24],                // 髋横线
+  [23,25],[24,26],        // 大腿：髋→膝
+  [25,27],[26,28]         // 小腿：膝→踝
+];
+const LOWER_COLOR       = "#76ff03"; // 亮绿色
+const LOWER_JOINT_COLOR = "#64dd17";
+const HIP_COLOR         = "#b2ff59";
+
+/* 握拳 */
+const FIST_THRESHOLD = 0.22;
+const FINGERTIP_IDX  = [4,8,12,16,20];
+
+/* ==================== 工具函数 ==================== */
+function getFingerType(i) {
+  if(i===0)return"palm"; if(i<=4)return"thumb"; if(i<=8)return"index";
+  if(i<=12)return"middle"; if(i<=16)return"ring"; return"pinky";
+}
+function getHandConnColor(s,e) {
+  if((s===0&&[5,9,13,17].includes(e))||(e===0&&[5,9,13,17].includes(s))) return FINGER_COLORS.palm.line;
+  return FINGER_COLORS[getFingerType(s)].line;
+}
+function drawPoint(cx,cy,r,fill,stroke) {
+  if(stroke){ctx.fillStyle=stroke;ctx.beginPath();ctx.arc(cx,cy,r+2,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle=fill;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+}
+
+/* ==================== 创建实例 ==================== */
+function createHandsInstance() {
+  const h = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`});
+  h.setOptions({
+    maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5
+  });
+  h.onResults(r=>{lastHandsResults=r;});
+  return h;
+}
+function createPoseInstance() {
+  const p = new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+  p.setOptions({
+    modelComplexity:1, smoothLandmarks:true, enableSegmentation:false,
+    minDetectionConfidence:0.5, minTrackingConfidence:0.5
+  });
+  p.onResults(r=>{lastPoseResults=r;});
+  return p;
+}
+
+/* ==================== 绘制 ==================== */
+function drawFrame() {
+  const w=canvasElement.width, h=canvasElement.height;
+  ctx.clearRect(0,0,w,h);
+
+  const poseLM   = lastPoseResults && lastPoseResults.poseLandmarks;
+  const leftHLM  = lastHandsResults && lastHandsResults.multiHandLandmarks
+    ? (lastHandsResults.multiHandedness||[]).map((d,i)=>({landmarks:lastHandsResults.multiHandLandmarks[i],handedness:d.label})) : [];
+  const hasPose  = poseLM && poseLM.length>0;
+  const hasHands = leftHLM.length>0;
+
+  if(!hasPose && !hasHands){infoPanel.classList.add("hidden");return;}
+
+  /* ---- 1. 手臂骨架 (Pose) ---- */
+  if(hasPose){
+    ctx.lineWidth=5; ctx.strokeStyle=ARM_COLOR; ctx.lineCap="round";
+    for(const[s,e] of ARM_CONNECTIONS){
+      if((poseLM[s].visibility||0)<0.3||(poseLM[e].visibility||0)<0.3) continue;
+      ctx.beginPath();
+      ctx.moveTo((1-poseLM[s].x)*w, poseLM[s].y*h);
+      ctx.lineTo((1-poseLM[e].x)*w, poseLM[e].y*h);
+      ctx.stroke();
+    }
+    // 肩膀横线
+    if((poseLM[11].visibility||0)>0.3&&(poseLM[12].visibility||0)>0.3){
+      ctx.beginPath();
+      ctx.moveTo((1-poseLM[11].x)*w, poseLM[11].y*h);
+      ctx.lineTo((1-poseLM[12].x)*w, poseLM[12].y*h);
+      ctx.stroke();
+    }
+    // 关节点
+    for(const idx of[11,12,13,14,15,16]){
+      if((poseLM[idx].visibility||0)<0.3) continue;
+      const isSh=(idx===11||idx===12);
+      drawPoint((1-poseLM[idx].x)*w, poseLM[idx].y*h, isSh?7:5, isSh?SHOULDER_COLOR:ARM_JOINT_COLOR, "#004d40");
+    }
+
+    /* ---- 1.5 躯干 + 下半身骨架 (Pose) ---- */
+    ctx.lineWidth=5; ctx.strokeStyle=LOWER_COLOR; ctx.lineCap="round";
+    for(const[s,e] of LOWER_CONNECTIONS){
+      if((poseLM[s].visibility||0)<0.3||(poseLM[e].visibility||0)<0.3) continue;
+      ctx.beginPath();
+      ctx.moveTo((1-poseLM[s].x)*w, poseLM[s].y*h);
+      ctx.lineTo((1-poseLM[e].x)*w, poseLM[e].y*h);
+      ctx.stroke();
+    }
+    for(const idx of[23,24,25,26,27,28]){
+      if((poseLM[idx].visibility||0)<0.3) continue;
+      const isHip=(idx===23||idx===24);
+      drawPoint((1-poseLM[idx].x)*w, poseLM[idx].y*h, isHip?6:5, isHip?HIP_COLOR:LOWER_JOINT_COLOR, "#1b5e20");
+    }
+  }
+
+  /* ---- 2. 手腕桥接 + 手部骨架 (Hands) ---- */
+  for(const hEntry of leftHLM){
+    const lm=hEntry.landmarks, hand=hEntry.handedness==="Right"?"右手":"左手";
+    // 尝试连接 Pose 手腕→Hands 手腕
+    if(hasPose){
+      const poseWristIdx = hand==="左手"?15:16;
+      if((poseLM[poseWristIdx].visibility||0)>0.3){
+        ctx.strokeStyle="#00e5ff55"; ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo((1-poseLM[poseWristIdx].x)*w, poseLM[poseWristIdx].y*h);
+        ctx.lineTo((1-lm[0].x)*w, lm[0].y*h);
+        ctx.stroke();
+      }
+    }
+    // 手部连线
+    ctx.lineWidth=3;
+    for(const[s,e] of HAND_CONNECTIONS){
+      ctx.strokeStyle=getHandConnColor(s,e);
+      ctx.beginPath();
+      ctx.moveTo((1-lm[s].x)*w,lm[s].y*h);
+      ctx.lineTo((1-lm[e].x)*w,lm[e].y*h);
+      ctx.stroke();
+    }
+    // 手指关节点
+    for(let j=0;j<lm.length;j++){
+      const cx=(1-lm[j].x)*w, cy=lm[j].y*h;
+      const r=j===0?6:4;
+      ctx.fillStyle=FINGER_COLORS[getFingerType(j)].dot;
+      ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#FFF";
+      ctx.beginPath();ctx.arc(cx,cy,r-1,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  /* ---- 3. 信息面板 ---- */
+  let html="";
+  for(const hEntry of leftHLM){
+    const lm=hEntry.landmarks, label=hEntry.handedness==="Right"?"右手":"左手", lc=label==="左手"?"#58a6ff":"#f0883e";
+    let td=0;
+    for(const i of FINGERTIP_IDX){
+      const dx=lm[i].x-lm[0].x, dy=lm[i].y-lm[0].y;
+      td+=Math.sqrt(dx*dx+dy*dy);
+    }
+    const avg=td/FINGERTIP_IDX.length, fist=avg<FIST_THRESHOLD;
+    html+=`<div class="hand-label" style="color:${lc}">${label} <span class="gesture-badge ${fist?"gesture-fist":"gesture-open"}">${fist?"握拳":"张开"}</span> <span style="font-size:0.62rem;color:#6e7681;">${avg.toFixed(3)}</span></div>`;
+    html+=`<div style="font-size:0.64rem;color:#8b949e;margin-top:2px;">`;
+    html+=`指尖:(拇指${lm[4].x.toFixed(2)},${lm[4].y.toFixed(2)}) 食指(${lm[8].x.toFixed(2)},${lm[8].y.toFixed(2)}) 中指(${lm[12].x.toFixed(2)},${lm[12].y.toFixed(2)}) 无名(${lm[16].x.toFixed(2)},${lm[16].y.toFixed(2)}) 小指(${lm[20].x.toFixed(2)},${lm[20].y.toFixed(2)})`;
+    html+=`</div>`;
+  }
+  infoPanel.innerHTML=html||"未检测到手部";
+  infoPanel.classList.remove("hidden");
+}
+
+/* ==================== 动画循环 ==================== */
+async function animationLoop() {
+  if(!isRunning) return;
+  if(videoElement.readyState>=2){
+    if(!handsBusy && handsInstance){handsBusy=true;handsInstance.send({image:videoElement}).catch(e=>{console.error("Hands:",e)}).finally(()=>{handsBusy=false;});}
+    if(!poseBusy && poseInstance){poseBusy=true;poseInstance.send({image:videoElement}).catch(e=>{console.error("Pose:",e)}).finally(()=>{poseBusy=false;});}
+  }
+  drawFrame();
+  animationId=requestAnimationFrame(animationLoop);
+}
+
+/* ==================== 摄像头控制 ==================== */
+async function startCamera() {
+  try{
+    statusText.textContent="正在启动..."; statusText.style.color="#8b949e"; btnStart.disabled=true;
+    mediaStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},audio:false});
+    const ml=new Promise(r=>{videoElement.onloadedmetadata=()=>{canvasElement.width=videoElement.videoWidth;canvasElement.height=videoElement.videoHeight;r();};});
+    videoElement.srcObject=mediaStream;
+    await ml;
+    placeholder.style.display="none"; hintArea.style.display="none";
+
+    if(!handsInstance){handsInstance=createHandsInstance();statusText.textContent="加载手部模型...";statusText.style.color="#d29922";const sc=document.createElement("canvas");sc.width=sc.height=1;await handsInstance.send({image:sc});}
+    if(!poseInstance){poseInstance=createPoseInstance();statusText.textContent="加载姿态模型...";statusText.style.color="#d29922";const sc=document.createElement("canvas");sc.width=sc.height=1;await poseInstance.send({image:sc});}
+
+    isRunning=true; animationId=requestAnimationFrame(animationLoop);
+    btnStart.disabled=true; btnStop.disabled=false;
+    statusDot.className="status-dot on"; statusText.textContent="运行中"; statusText.style.color="#3fb950";
+  }catch(e){
+    console.error("相机启动失败:",e);
+    statusText.textContent="错误: "+(e.message||"无法访问摄像头"); statusText.style.color="#f85149"; btnStart.disabled=false;
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+  }
+}
+
+function stopCamera() {
+  isRunning=false;
+  if(animationId){cancelAnimationFrame(animationId);animationId=null;}
+  if(handsInstance){try{handsInstance.close();}catch(e){}handsInstance=null;}
+  if(poseInstance){try{poseInstance.close();}catch(e){}poseInstance=null;}
+  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+  videoElement.srcObject=null;
+  ctx.clearRect(0,0,canvasElement.width,canvasElement.height);
+  lastHandsResults=null; lastPoseResults=null;
+  handsBusy=false; poseBusy=false;
+  placeholder.style.display="";
+  if(window.location.protocol==="file:")hintArea.style.display="";
+  btnStart.disabled=false; btnStop.disabled=true;
+  statusDot.className="status-dot"; statusText.textContent="就绪"; statusText.style.color="#f0883e";
+  infoPanel.classList.add("hidden");
+}
+
+btnStart.addEventListener("click",startCamera);
+btnStop.addEventListener("click",stopCamera);
+window.addEventListener("beforeunload",()=>{stopCamera();});
+console.log("手势交互可视化已就绪 · Pose + Hands 双模型 · 手部21点 + 手臂骨架");
+</script>
+</body>
+</html>

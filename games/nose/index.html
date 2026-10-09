@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>你画我猜（鼻子版）· 用鼻子作画</title>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;
+  background:#08080d; color:#e6edf3; width:100vw; height:100vh; overflow:hidden;
+}
+.app { display:flex; width:100%; height:100%; }
+
+/* ===== 左：摄像头 ===== */
+.cam-panel {
+  width:46%; height:100%; flex-shrink:0; padding:24px 22px;
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  background:#0d0f16; border-right:1px solid #1e2130;
+}
+.title { font-size:1.5rem; font-weight:700; text-align:center;
+  background:linear-gradient(135deg,#ff9a6c,#ff5c7a); -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent; background-clip:text; line-height:1.35; }
+.subtitle { font-size:0.76rem; color:#6b7080; text-align:center; margin-top:-8px; }
+.cam-wrap {
+  position:relative; width:100%; max-width:520px; aspect-ratio:4/3;
+  background:#000; border-radius:16px; overflow:hidden; border:1px solid #1e2130;
+}
+.cam-wrap video, .cam-wrap canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.cam-wrap video { transform:scaleX(-1); }   /* 镜像，符合照镜子直觉 */
+.cam-wrap canvas { z-index:2; }
+.placeholder { position:absolute; inset:0; z-index:3; display:flex; align-items:center;
+  justify-content:center; font-size:2.6rem; opacity:0.22; pointer-events:none; }
+.placeholder.hidden { display:none; }
+
+.ctrl { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; width:100%; }
+.btn { padding:9px 18px; border:none; border-radius:10px; font-size:0.82rem; font-weight:600;
+  cursor:pointer; transition:all .2s; outline:none; background:#21262d; color:#e6edf3; }
+.btn:hover { background:#30363d; }
+.btn:disabled { background:#161b22; color:#484f58; cursor:not-allowed; }
+.btn.primary { background:#238636; color:#fff; }
+.btn.primary:hover { background:#2ea043; }
+.btn.primary:disabled { background:#1a2b20; color:#4a5c50; cursor:not-allowed; }
+.btn.warn { background:#8b3a3a; color:#fff; }
+.btn.warn:hover { background:#a34a4a; }
+.btn.quit { background:#3a2a2a; color:#ff9a9a; border:1px solid #5c3535; }
+.btn.quit:hover { background:#4a3232; color:#ffb4b4; }
+.btn.active { background:#b8911e; color:#fff; box-shadow:0 0 10px rgba(255,215,94,.35); }
+.btn.active:hover { background:#c9a22a; }
+select { background:#11131c; color:#e6edf3; border:1px solid #2a2444;
+  border-radius:10px; padding:8px 10px; font-size:0.8rem; outline:none; }
+
+.status { font-size:0.76rem; color:#8b949e; display:flex; align-items:center; gap:6px; }
+.dot { width:8px; height:8px; border-radius:50%; background:#484f58; display:inline-block; }
+.dot.on { background:#3fb950; box-shadow:0 0 8px rgba(63,185,80,.6); animation:pulse 2s infinite; }
+.dot.calib { background:#d29922; box-shadow:0 0 8px rgba(210,153,34,.6); animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.45;} }
+
+.hint { width:100%; max-width:520px; background:#0d0f16; border:1px solid #1a1d2a;
+  border-radius:12px; padding:14px 16px; font-size:0.74rem; color:#8b949e; line-height:1.95; }
+.hint b { color:#7ee787; }
+.hint code { background:#1a1d2a; color:#7ee787; padding:2px 7px; border-radius:4px; font-size:0.72rem; }
+
+/* ===== 右：画板 ===== */
+.board-panel { flex:1; height:100%; padding:24px 26px; display:flex; flex-direction:column; gap:14px; }
+.word-bar { display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:#11131c; border:1px solid #1e2130; border-radius:14px; padding:12px 18px; }
+.prog { font-size:0.78rem; color:#6b7080; font-weight:600; }
+.word { font-size:1.4rem; font-weight:700; color:#ffd75e; letter-spacing:2px; }
+.timer { font-size:1.1rem; font-weight:700; color:#58a6ff; min-width:52px; text-align:right; }
+.timer.urgent { color:#ff7b72; }
+.bar-right { display:flex; align-items:center; gap:10px; }
+
+.board-wrap { flex:1; position:relative; background:#fff; border-radius:16px;
+  overflow:hidden; border:1px solid #1e2130; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+#board { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; touch-action:none; }
+.board-hint { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  color:#c9ced6; font-size:0.9rem; text-align:center; pointer-events:none; }
+
+.tools { display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  background:#11131c; border:1px solid #1e2130; border-radius:14px; padding:12px 18px; font-size:0.78rem; }
+.tools label { display:flex; align-items:center; gap:6px; color:#8b949e; }
+.tools input[type=color] { width:32px; height:26px; border:none; background:none; cursor:pointer; }
+.tools input[type=range] { width:100px; }
+.tools .spacer { flex:1; }
+.tip { font-size:0.72rem; color:#6b7080; }
+
+/* ===== 覆盖层 ===== */
+.overlay { position:fixed; inset:0; z-index:50; background:rgba(8,8,13,.95);
+  display:flex; align-items:center; justify-content:center; padding:30px; }
+.overlay.hidden { display:none; }
+.card { width:100%; max-width:640px; background:#11131c; border:1px solid #1e2130;
+  border-radius:20px; padding:34px 32px; text-align:center; }
+.card h2 { font-size:1.35rem; margin-bottom:10px; color:#ffd75e; }
+.card p { font-size:0.82rem; color:#8b949e; line-height:2; margin-bottom:16px; }
+.card .big { font-size:1.05rem; color:#e6edf3; font-weight:600; }
+
+/* 选题：5 个候选词 */
+.pick-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:20px 0; }
+.pick-card { background:#161b22; border:1px solid #2a3140; border-radius:14px; padding:20px 12px;
+  font-size:1.05rem; font-weight:700; color:#e6edf3; cursor:pointer; transition:all .18s; }
+.pick-card:hover { background:#1f2733; border-color:#58a6ff; transform:translateY(-3px);
+  box-shadow:0 6px 18px rgba(88,166,255,.18); }
+.pick-card .idx { display:block; font-size:0.68rem; color:#6b7080; font-weight:500; margin-bottom:6px; }
+
+/* 画廊 */
+.gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin:18px 0; }
+.gallery figure { background:#0d0f16; border:1px solid #1e2130; border-radius:14px;
+  overflow:hidden; padding:10px; }
+.gallery img { width:100%; border-radius:9px; background:#fff; display:block; cursor:pointer; }
+.gallery figcaption { font-size:0.74rem; color:#6b7080; padding:8px 2px 2px; }
+.tags { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; padding:6px 2px 2px; }
+.tag { font-size:0.68rem; padding:3px 8px; border-radius:20px; background:#161b22;
+  color:#6b7080; border:1px solid #232a36; white-space:nowrap; }
+.tag.picked { background:rgba(255,215,94,.16); color:#ffd75e; border-color:rgba(255,215,94,.55);
+  font-weight:700; box-shadow:0 0 10px rgba(255,215,94,.25); }
+
+@media (max-width:900px) {
+  body { overflow:auto; }
+  .app { flex-direction:column; height:auto; }
+  .cam-panel, .board-panel { width:100%; height:auto; border-right:none; }
+  .board-wrap { min-height:340px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- 左：摄像头 -->
+  <section class="cam-panel">
+    <div class="title">👃 你画我猜（鼻子版）</div>
+    <div class="subtitle">前置摄像头 · 鼻尖轨迹 · 空中作画</div>
+
+    <div class="cam-wrap">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="placeholder" id="placeholder">📷</div>
+    </div>
+
+    <div class="ctrl">
+      <button id="btnCam" class="btn primary">开启摄像头</button>
+      <button id="btnCalib" class="btn" disabled>重新校准</button>
+      <select id="selGain">
+        <option value="1.6">灵敏度 标准</option>
+        <option value="2.4">灵敏度 灵敏</option>
+        <option value="1.0">灵敏度 迟钝</option>
+      </select>
+      <select id="selMode">
+        <option value="draw">鼻尖：画笔</option>
+        <option value="erase">鼻尖：橡皮</option>
+      </select>
+    </div>
+
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">就绪</span></div>
+
+    <div class="hint">
+      <b>玩法</b>：开启摄像头 → 正对镜头不动 2 秒自动校准 → 每题从 <b>5 个词里选 1 个</b>，用<b>鼻尖在空中写</b>出它。<br>
+      <b>擦除</b>：<b>点工具栏「🧽 橡皮擦」开关</b>后鼠标在画板上<b>移动即擦</b>（触屏拖动也行）；不开开关时<b>按住鼠标左键拖动</b>同样可擦。<br>
+      <b>快捷键</b>：<code>C</code> 清屏 · <code>Z</code> 撤销上一笔 · <code>空格</code> 抬笔 · <code>E</code> 橡皮擦开关 · <code>N</code> 下一题 · <code>R</code> 重开
+    </div>
+  </section>
+
+  <!-- 右：画板 -->
+  <section class="board-panel">
+    <div class="word-bar">
+      <span class="prog" id="prog">第 1 / 5 题</span>
+      <span class="word" id="word">— —</span>
+      <span class="bar-right">
+        <span class="timer" id="timer">45s</span>
+        <button id="btnQuit" class="btn quit">✕ 退出</button>
+      </span>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="board"></canvas>
+      <div class="board-hint" id="boardHint">开启摄像头后开始作画</div>
+    </div>
+
+    <div class="tools">
+      <label>颜色 <input type="color" id="color" value="#e24b4a"></label>
+      <label>粗细 <input type="range" id="size" min="2" max="26" value="7"></label>
+      <button id="btnPen" class="btn">✏️ 落笔</button>
+      <button id="btnEraser" class="btn" title="开启后鼠标在画板上直接移动即擦除（无需按住）">🧽 橡皮擦</button>
+      <span class="tip" id="tipEraser">按住鼠标拖动 = 擦除</span>
+      <span class="spacer"></span>
+      <button id="btnUndo" class="btn">↩ 撤销</button>
+      <button id="btnClear" class="btn warn">清屏</button>
+      <button id="btnNext" class="btn primary">完成，下一题</button>
+    </div>
+  </section>
+</div>
+
+<!-- 开始覆盖层 -->
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <h2>👃 你画我猜（鼻子版）</h2>
+    <p>
+      共 <b>5 题</b>，每题会给出 <b>5 个候选词</b>，你挑一个最有把握的，<br>
+      然后用<b>鼻尖当画笔</b>在摄像头前把它"写"出来，画板同步留下轨迹。<br>
+      每题 <b>45 秒</b>；不满意的线条可以<b>用鼠标擦掉</b>；随时可<b>退出</b>（退出不保留结果）。
+    </p>
+    <p class="big">准备好了吗？先开启摄像头 →</p>
+    <button id="btnStartCam" class="btn primary">📷 开启摄像头并开始</button>
+  </div>
+</div>
+
+<!-- 选题覆盖层：每题 5 选 1 -->
+<div class="overlay hidden" id="pickScreen">
+  <div class="card">
+    <h2 id="pickTitle">第 1 / 5 题 — 选一个词来画</h2>
+    <p>点一个你想画的词。画完还能用鼠标擦掉不满意的线条。</p>
+    <div class="pick-grid" id="pickGrid"></div>
+    <button id="btnReroll" class="btn">🔄 换一批词</button>
+  </div>
+</div>
+
+<!-- 画廊覆盖层 -->
+<div class="overlay hidden" id="galleryScreen">
+  <div class="card">
+    <h2>🎨 你的 5 幅大作</h2>
+    <p>每幅下方是当时的 5 个候选词，<b style="color:#ffd75e">金色高亮</b>的是你选中的那个。点图片可下载保存。</p>
+    <div class="gallery" id="gallery"></div>
+    <button id="btnAgain" class="btn primary">再来一轮</button>
+    <button id="btnHome" class="btn quit">✕ 退出</button>
+  </div>
+</div>
+
+<!-- MediaPipe FaceMesh（468 点人脸网格，鼻尖精度远高于全身姿态） -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+
+<script>
+/* ============================================================
+ * 你画我猜（鼻子版）
+ * 原理：MediaPipe FaceMesh 每帧检测人脸 468 个关键点，取「鼻尖(index 1)」
+ *      的归一化坐标 → 相对校准基准的偏移 → 放大后映射到画板 → 连线成画。
+ * 镜像：摄像头画面镜像显示，鼻尖 x 取 (1 - x)，符合"照镜子"的直觉。
+ * 擦除：鼠标/手指在画板拖动 = 圆形橡皮（destination-out），与鼻尖橡皮共用同一套笔画数据。
+ * ============================================================ */
+(function () {
+  'use strict';
+
+  // ---------- 配置 ----------
+  const WORDS = [
+    '苹果','房子','笑脸','太阳','小鱼','大树','爱心','星星','雨伞','汽车',
+    '小猫','小船','云朵','花朵','眼镜','时钟','钥匙','月亮','大山','小鸟',
+    '杯子','书本','闪电','雪人','帽子','火箭','蛋糕','气球','西瓜','彩虹',
+    '笑脸猫','冰淇淋','灯泡','帆船','蘑菇','足球','剪刀','甜甜圈','章鱼','恐龙'
+  ];
+  const TOTAL = 5;          // 共几题
+  const PICKS = 5;          // 每题蹦出几个候选词
+  const TIME_PER = 45;      // 每题秒数
+  const ERASER = 30;        // 鼠标/鼻尖橡皮的粗细
+
+  // ---------- DOM ----------
+  const video    = document.getElementById('video');
+  const overlay  = document.getElementById('overlay');
+  const octx     = overlay.getContext('2d');
+  const board    = document.getElementById('board');
+  const bctx     = board.getContext('2d');
+  const placeholder = document.getElementById('placeholder');
+  const btnCam   = document.getElementById('btnCam');
+  const btnStartCam = document.getElementById('btnStartCam');
+  const btnCalib = document.getElementById('btnCalib');
+  const btnPen   = document.getElementById('btnPen');
+  const btnEraser= document.getElementById('btnEraser');
+  const tipEraser= document.getElementById('tipEraser');
+  const btnUndo  = document.getElementById('btnUndo');
+  const btnClear = document.getElementById('btnClear');
+  const btnNext  = document.getElementById('btnNext');
+  const btnQuit  = document.getElementById('btnQuit');
+  const btnHome  = document.getElementById('btnHome');
+  const btnAgain = document.getElementById('btnAgain');
+  const btnReroll= document.getElementById('btnReroll');
+  const selGain  = document.getElementById('selGain');
+  const selMode  = document.getElementById('selMode');
+  const inpColor = document.getElementById('color');
+  const inpSize  = document.getElementById('size');
+  const elWord   = document.getElementById('word');
+  const elProg   = document.getElementById('prog');
+  const elTimer  = document.getElementById('timer');
+  const elDot    = document.getElementById('dot');
+  const elStatus = document.getElementById('statusText');
+  const elHint   = document.getElementById('boardHint');
+  const startScreen   = document.getElementById('startScreen');
+  const pickScreen    = document.getElementById('pickScreen');
+  const pickGrid      = document.getElementById('pickGrid');
+  const pickTitle     = document.getElementById('pickTitle');
+  const galleryScreen = document.getElementById('galleryScreen');
+  const elGallery     = document.getElementById('gallery');
+
+  // ---------- 状态 ----------
+  let faceMesh = null, busy = false, running = false, rafId = 0;
+  let lastFace = null, mediaStream = null;
+  let calib = null;                 // { x, y } 校准基准（鼻尖中立位）
+  let calibSamples = [], calibUntil = 0, calibrating = false;
+  let brush = { x: 0, y: 0, has: false };
+  let penDown = true;               // 鼻尖是否落笔
+  let spaceHeld = false;            // 按住空格 = 临时抬笔
+  let gain = parseFloat(selGain.value) || 1.6;
+  let questions = [], qIndex = 0, timeLeft = TIME_PER, lastTick = 0;
+  let playing = false, picking = false;   // picking = 正在选词（暂停计时）
+  let strokes = [];                 // [{ color, size, mode, pts:[{x,y}] }]
+  let curStroke = null;             // 当前鼻尖笔画
+  let curErase = null;              // 当前鼠标擦除笔画
+
+  function dpr() { return Math.min(window.devicePixelRatio || 1, 2); }
+  function boardSize() { return { w: board.width / dpr(), h: board.height / dpr() }; }
+
+  // ---------- 画板 ----------
+  function resizeBoard() {
+    const r = board.getBoundingClientRect();
+    const d = dpr();
+    board.width  = Math.max(1, Math.floor(r.width  * d));
+    board.height = Math.max(1, Math.floor(r.height * d));
+    bctx.setTransform(d, 0, 0, d, 0, 0);
+    redrawBoard();
+  }
+  function redrawBoard() {
+    const s = boardSize();
+    bctx.clearRect(0, 0, s.w, s.h);
+    for (const st of strokes) drawStroke(st);
+  }
+  function drawStroke(st) {
+    const erase = st.mode === 'erase';
+    bctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
+    if (!erase) bctx.strokeStyle = st.color;
+    bctx.lineWidth = st.size;
+    bctx.lineCap = 'round';
+    bctx.lineJoin = 'round';
+    bctx.beginPath();
+    st.pts.forEach((p, i) => { i ? bctx.lineTo(p.x, p.y) : bctx.moveTo(p.x, p.y); });
+    if (st.pts.length === 1) bctx.lineTo(st.pts[0].x + 0.1, st.pts[0].y);   // 单点也留个圆点
+    bctx.stroke();
+    bctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---------- MediaPipe ----------
+  function createFaceMesh() {
+    const fm = new window.FaceMesh({
+      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
+    });
+    fm.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    fm.onResults(r => { lastFace = r; });
+    return fm;
+  }
+  function getNose() {
+    if (!lastFace || !lastFace.multiFaceLandmarks || !lastFace.multiFaceLandmarks.length) return null;
+    const lm = lastFace.multiFaceLandmarks[0];
+    const n = lm[1] || lm[4] || lm[6];
+    if (!n) return null;
+    return { x: 1 - n.x, y: n.y };   // 镜像
+  }
+
+  // ---------- 主循环 ----------
+  function loop(ts) {
+    rafId = requestAnimationFrame(loop);
+    if (!running) return;
+
+    if (video.readyState >= 2 && faceMesh && !busy) {
+      busy = true;
+      faceMesh.send({ image: video }).catch(e => console.error('[FaceMesh]', e)).finally(() => { busy = false; });
+    }
+
+    const now = performance.now();
+    if (calibrating) {
+      const n = getNose();
+      if (n) calibSamples.push(n);
+      if (now >= calibUntil) finishCalib();
+    }
+
+    drawOverlay();
+    updateBrush();
+    tickTimer(ts);
+  }
+
+  function drawOverlay() {
+    const cw = overlay.clientWidth, ch = overlay.clientHeight;
+    if (overlay.width !== cw || overlay.height !== ch) { overlay.width = cw; overlay.height = ch; }
+    octx.clearRect(0, 0, cw, ch);
+    const n = getNose();
+    if (!n) return;
+    const x = n.x * cw, y = n.y * ch;
+    if (calib) {
+      octx.strokeStyle = 'rgba(255,215,94,0.55)';
+      octx.lineWidth = 1.5;
+      octx.beginPath();
+      octx.moveTo(calib.x * cw - 12, calib.y * ch); octx.lineTo(calib.x * cw + 12, calib.y * ch);
+      octx.moveTo(calib.x * cw, calib.y * ch - 12); octx.lineTo(calib.x * cw, calib.y * ch + 12);
+      octx.stroke();
+    }
+    const active = penDown && !spaceHeld;
+    octx.beginPath(); octx.arc(x, y, 10, 0, Math.PI * 2);
+    octx.fillStyle = active ? 'rgba(255,92,122,0.30)' : 'rgba(88,166,255,0.30)';
+    octx.fill();
+    octx.beginPath(); octx.arc(x, y, 4, 0, Math.PI * 2);
+    octx.fillStyle = active ? '#ff5c7a' : '#58a6ff';
+    octx.fill();
+    octx.strokeStyle = 'rgba(255,255,255,0.85)'; octx.lineWidth = 1.5; octx.stroke();
+  }
+
+  function updateBrush() {
+    if (!playing || picking || !calib || calibrating) { brush.has = false; return; }
+    const n = getNose();
+    if (!n) { brush.has = false; return; }
+
+    const s = boardSize();
+    const dx = (n.x - calib.x) * gain;
+    const dy = (n.y - calib.y) * gain;
+    let tx = Math.max(0, Math.min(s.w, s.w / 2 + dx * s.w));
+    let ty = Math.max(0, Math.min(s.h, s.h / 2 + dy * s.h));
+
+    if (!brush.has) { brush.x = tx; brush.y = ty; brush.has = true; }
+    else { brush.x += (tx - brush.x) * 0.45; brush.y += (ty - brush.y) * 0.45; }
+
+    if (!(penDown && !spaceHeld)) { curStroke = null; return; }
+    const mode = selMode.value;
+    if (!curStroke) {
+      curStroke = { color: inpColor.value, size: mode === 'erase' ? ERASER : parseInt(inpSize.value, 10), mode: mode, pts: [] };
+      strokes.push(curStroke);
+    }
+    curStroke.pts.push({ x: brush.x, y: brush.y });
+    if (curStroke.pts.length > 4000) curStroke.pts.shift();
+
+    // 增量绘制最后一段
+    const pts = curStroke.pts;
+    const a = pts.length > 1 ? pts[pts.length - 2] : pts[0];
+    const b = pts[pts.length - 1];
+    bctx.globalCompositeOperation = (mode === 'erase') ? 'destination-out' : 'source-over';
+    if (mode !== 'erase') bctx.strokeStyle = curStroke.color;
+    bctx.lineWidth = curStroke.size;
+    bctx.lineCap = 'round'; bctx.lineJoin = 'round';
+    bctx.beginPath(); bctx.moveTo(a.x, a.y); bctx.lineTo(b.x, b.y); bctx.stroke();
+    bctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---------- 鼠标 / 手指擦除 ----------
+  let erasing = false;
+  let eraserTool = false;   // 「橡皮擦工具」开关：开启后鼠标在画板上移动即擦除
+  function boardPos(e) {
+    const r = board.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };   // CSS 像素（ctx 已按 dpr 变换）
+  }
+  function eraseAt(p) {
+    if (!curErase) {
+      curErase = { color: '#000', size: ERASER, mode: 'erase', pts: [] };
+      strokes.push(curErase);
+    }
+    curErase.pts.push(p);
+    if (curErase.pts.length > 4000) curErase.pts.shift();
+    const pts = curErase.pts;
+    const a = pts.length > 1 ? pts[pts.length - 2] : pts[0];
+    const b = pts[pts.length - 1];
+    bctx.globalCompositeOperation = 'destination-out';
+    bctx.lineWidth = curErase.size;
+    bctx.lineCap = 'round'; bctx.lineJoin = 'round';
+    bctx.beginPath(); bctx.moveTo(a.x, a.y); bctx.lineTo(b.x, b.y); bctx.stroke();
+    bctx.globalCompositeOperation = 'source-over';
+  }
+  board.addEventListener('pointerdown', e => {
+    erasing = true;
+    board.setPointerCapture && board.setPointerCapture(e.pointerId);
+    eraseAt(boardPos(e));
+    e.preventDefault();
+  });
+  board.addEventListener('pointermove', e => {
+    // 工具开启（悬停即擦）或正按住拖动 → 擦除
+    if (eraserTool || erasing) eraseAt(boardPos(e));
+  });
+  const endErase = () => { erasing = false; curErase = null; };
+  board.addEventListener('pointerup', endErase);
+  board.addEventListener('pointercancel', endErase);
+  board.addEventListener('pointerleave', endErase);
+
+  // ---------- 校准 ----------
+  function startCalib() {
+    calibrating = true; calibSamples = []; calibUntil = performance.now() + 2000;
+    calib = null; strokes = []; curStroke = null; curErase = null;
+    redrawBoard();
+    setStatus('calib', '校准中：请正对镜头，头部保持不动…');
+  }
+  function finishCalib() {
+    calibrating = false;
+    if (!calibSamples.length) { setStatus('off', '未检测到人脸，请调整位置后重试'); return; }
+    const xs = calibSamples.map(p => p.x).sort((a, b) => a - b);
+    const ys = calibSamples.map(p => p.y).sort((a, b) => a - b);
+    calib = { x: xs[Math.floor(xs.length / 2)], y: ys[Math.floor(ys.length / 2)] };
+    brush.has = false;
+    setStatus('on', '已就绪 — 动动鼻子开始作画');
+    elHint.textContent = '';
+  }
+  function setStatus(kind, text) {
+    elDot.className = 'dot' + (kind === 'on' ? ' on' : kind === 'calib' ? ' calib' : '');
+    elStatus.textContent = text;
+  }
+
+  // ---------- 关卡流程 ----------
+  function pickWords(n) {
+    const pool = WORDS.slice(), out = [];
+    for (let i = 0; i < n && pool.length; i++) {
+      out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    }
+    return out;
+  }
+  function startGame() {
+    questions = [];
+    for (let i = 0; i < TOTAL; i++) {
+      questions.push({ candidates: pickWords(PICKS), picked: null, image: null });
+    }
+    qIndex = 0; playing = true;
+    showPick();
+  }
+  // 每题先蹦 5 个词，用户选一个
+  function showPick() {
+    if (qIndex >= questions.length) return finishGame();
+    picking = true;
+    strokes = []; curStroke = null; curErase = null;
+    redrawBoard();
+    elProg.textContent = `第 ${qIndex + 1} / ${TOTAL} 题`;
+    elWord.textContent = '待选题';
+    pickTitle.textContent = `第 ${qIndex + 1} / ${TOTAL} 题 — 选一个词来画`;
+    renderPickGrid();
+    pickScreen.classList.remove('hidden');
+  }
+  function renderPickGrid() {
+    pickGrid.innerHTML = '';
+    questions[qIndex].candidates.forEach((w, i) => {
+      const el = document.createElement('div');
+      el.className = 'pick-card';
+      el.innerHTML = `<span class="idx">候选 ${i + 1}</span>${w}`;
+      el.onclick = () => pickWord(w);
+      pickGrid.appendChild(el);
+    });
+  }
+  function pickWord(w) {
+    questions[qIndex].picked = w;
+    pickScreen.classList.add('hidden');
+    picking = false;
+    elWord.textContent = w;
+    timeLeft = TIME_PER;
+    lastTick = 0;
+    updateTimerUI();
+  }
+
+  function tickTimer(ts) {
+    if (!playing || picking || calibrating) return;
+    if (!lastTick) lastTick = ts;
+    timeLeft -= (ts - lastTick) / 1000;
+    lastTick = ts;
+    if (timeLeft <= 0) { timeLeft = 0; updateTimerUI(); advance(); return; }
+    updateTimerUI();
+  }
+  function updateTimerUI() {
+    elTimer.textContent = Math.ceil(timeLeft) + 's';
+    elTimer.className = 'timer' + (timeLeft <= 10 ? ' urgent' : '');
+  }
+  function advance() {
+    const q = questions[qIndex];
+    if (q) q.image = board.toDataURL('image/png');   // 保存本题画作
+    qIndex++;
+    lastTick = 0;
+    showPick();
+  }
+  function finishGame() {
+    playing = false; picking = false;
+    elWord.textContent = '完成！';
+    showGallery();
+  }
+  function showGallery() {
+    elGallery.innerHTML = '';
+    questions.forEach((q, i) => {
+      if (!q.image) return;
+      const fig = document.createElement('figure');
+      const img = document.createElement('img');
+      img.src = q.image;
+      img.alt = q.picked || '';
+      img.title = '点击下载';
+      img.onclick = () => {
+        const a = document.createElement('a');
+        a.href = q.image;
+        a.download = `鼻子画-${i + 1}-${q.picked || '未选'}.png`;
+        a.click();
+      };
+      const cap = document.createElement('figcaption');
+      cap.textContent = `第 ${i + 1} 题`;
+      const tags = document.createElement('div');
+      tags.className = 'tags';
+      q.candidates.forEach(w => {
+        const t = document.createElement('span');
+        t.className = 'tag' + (w === q.picked ? ' picked' : '');
+        t.textContent = w;
+        tags.appendChild(t);
+      });
+      fig.appendChild(img); fig.appendChild(cap); fig.appendChild(tags);
+      elGallery.appendChild(fig);
+    });
+    galleryScreen.classList.remove('hidden');
+  }
+
+  // ---------- 退出（结果不保留） ----------
+  function quitGame() {
+    if (!confirm('确定退出吗？本轮的画作不会被保留。')) return;
+    playing = false; picking = false;
+    questions = []; qIndex = 0; snapshotsClear();
+    strokes = []; curStroke = null; curErase = null;
+    redrawBoard();
+    galleryScreen.classList.add('hidden');
+    pickScreen.classList.add('hidden');
+    stopCamera();
+    elWord.textContent = '— —';
+    elProg.textContent = `第 1 / ${TOTAL} 题`;
+    timeLeft = TIME_PER;
+    updateTimerUI();
+    elHint.textContent = '已退出，点「开启摄像头」重新开始';
+    startScreen.classList.remove('hidden');
+  }
+  function snapshotsClear() {
+    // 画作只存在 questions 里，清空即可（没有写入 localStorage，退出即消失）
+  }
+
+  // ---------- 摄像头 ----------
+  async function startCamera() {
+    try {
+      setStatus('calib', '正在启动摄像头…');
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false
+      });
+      video.srcObject = mediaStream;
+      await new Promise(r => { video.onloadedmetadata = () => r(); });
+      await video.play().catch(() => {});
+      placeholder.classList.add('hidden');
+
+      if (!faceMesh) faceMesh = createFaceMesh();
+      const sc = document.createElement('canvas'); sc.width = sc.height = 1;
+      await faceMesh.send({ image: sc }).catch(() => {});   // 预热模型
+
+      running = true;
+      if (!rafId) rafId = requestAnimationFrame(loop);
+      btnCalib.disabled = false;
+      btnCam.textContent = '关闭摄像头';
+      startScreen.classList.add('hidden');
+      startCalib();
+      let tries = 0;
+      const waitCalib = setInterval(() => {
+        tries++;
+        if (calib) { clearInterval(waitCalib); startGame(); }
+        else if (tries > 30) { clearInterval(waitCalib); setStatus('off', '未检测到人脸，请调整位置后点「重新校准」'); }
+      }, 500);
+      return true;
+    } catch (e) {
+      console.error('摄像头启动失败:', e);
+      setStatus('off', '摄像头启动失败：' + (e.message || '无法访问'));
+      return false;
+    }
+  }
+  function stopCamera() {
+    running = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    if (faceMesh) { try { faceMesh.close(); } catch (e) {} faceMesh = null; }
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    video.srcObject = null;
+    lastFace = null;
+    placeholder.classList.remove('hidden');
+    btnCalib.disabled = true;
+    btnCam.textContent = '开启摄像头';
+    setStatus('off', '就绪');
+  }
+
+  // ---------- 事件 ----------
+  btnCam.addEventListener('click', () => { running ? stopCamera() : startCamera(); });
+  btnStartCam.addEventListener('click', startCamera);
+  btnCalib.addEventListener('click', () => { if (running) startCalib(); else startCamera(); });
+  btnPen.addEventListener('click', () => {
+    penDown = !penDown;
+    btnPen.textContent = penDown ? '✏️ 落笔' : '⏸ 抬笔';
+    curStroke = null;
+  });
+  btnUndo.addEventListener('click', undoStroke);
+  btnClear.addEventListener('click', () => { strokes = []; curStroke = null; curErase = null; redrawBoard(); });
+  btnNext.addEventListener('click', () => { if (playing && !picking) advance(); });
+  btnQuit.addEventListener('click', quitGame);
+  btnHome.addEventListener('click', quitGame);
+  btnAgain.addEventListener('click', () => { galleryScreen.classList.add('hidden'); startGame(); });
+  btnReroll.addEventListener('click', () => {
+    questions[qIndex].candidates = pickWords(PICKS);
+    renderPickGrid();
+  });
+  selGain.addEventListener('change', () => { gain = parseFloat(selGain.value) || 1.6; });
+
+  // ---------- 「橡皮擦工具」开关 ----------
+  function toggleEraserTool() {
+    eraserTool = !eraserTool;
+    btnEraser.classList.toggle('active', eraserTool);
+    tipEraser.textContent = eraserTool
+      ? '🧽 橡皮擦已开启：鼠标在画板上移动即擦除（再点按钮关闭）'
+      : '按住鼠标拖动 = 擦除';
+    elHint.textContent = eraserTool ? '橡皮擦工具开启中：鼠标悬停画板即可擦除' : '';
+    curErase = null;   // 切换时断开当前橡皮笔画，避免跨状态合并
+    erasing = false;
+  }
+  btnEraser.addEventListener('click', toggleEraserTool);
+
+  function undoStroke() {
+    // 撤销"最后一笔可见内容"（擦除笔也可被撤销）
+    if (!strokes.length) return;
+    strokes.pop();
+    curStroke = null; curErase = null;
+    redrawBoard();
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { spaceHeld = true; e.preventDefault(); }
+    else if (e.key === 'c' || e.key === 'C') { strokes = []; curStroke = null; curErase = null; redrawBoard(); }
+    else if (e.key === 'z' || e.key === 'Z') { undoStroke(); }
+    else if (e.key === 'n' || e.key === 'N') { if (playing && !picking) advance(); }
+    else if (e.key === 'r' || e.key === 'R') { galleryScreen.classList.add('hidden'); startGame(); }
+    else if (e.key === 'e' || e.key === 'E') { toggleEraserTool(); }
+  });
+  window.addEventListener('keyup', e => { if (e.code === 'Space') spaceHeld = false; });
+  window.addEventListener('resize', resizeBoard);
+  window.addEventListener('beforeunload', stopCamera);
+
+  // ---------- 调试钩子（控制台 / 自动化测试可用，不影响正常游玩） ----------
+  window.__nose = {
+    startGame, showPick, pickWord, advance, finishGame, showGallery, quitGame, undoStroke, eraseAt,
+    setCalib: (x, y) => { calib = { x: x, y: y }; brush.has = false; },
+    setPlaying: (v) => { playing = !!v; picking = false; },
+    addStroke: (pts, mode, color, size) => {
+      strokes.push({ color: color || '#e24b4a', size: size || 8, mode: mode || 'draw', pts: pts });
+      redrawBoard();
+    },
+    eraseStroke: (pts) => {
+      strokes.push({ color: '#000', size: ERASER, mode: 'erase', pts: pts });
+      redrawBoard();
+    },
+    state: () => ({
+      playing: playing, picking: picking, qIndex: qIndex, total: TOTAL,
+      candidates: questions[qIndex] ? questions[qIndex].candidates : null,
+      picked: questions[qIndex] ? questions[qIndex].picked : null,
+      strokes: strokes.length, hasCalib: !!calib, running: running,
+      boardPixels: (function () {
+        const d = board.getContext('2d').getImageData(0, 0, board.width, board.height).data;
+        let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 10) n++;
+        return n;   // 非透明像素数，用于验证"画上了 / 擦掉了"
+      })(),
+    }),
+    questions: () => questions
+  };
+
+  // ---------- 初始化 ----------
+  resizeBoard();
+  elHint.textContent = '点「开启摄像头并开始」→ 允许权限 → 校准 2 秒 → 选题作画';
+  updateTimerUI();
+})();
+</script>
+</body>
+</html>
