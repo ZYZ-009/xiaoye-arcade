@@ -189,6 +189,32 @@ h3{font-size:19px}
 .helpby a:hover{color:var(--green-sh)}
 .helpby .sp2{margin-left:auto}
 
+/* 「+」加一个游戏 */
+.gcard.plus{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;padding:30px 18px;text-align:center;border-style:dashed;border-color:#D8D8D8;
+  background:linear-gradient(#fff,#FAFAFA);box-shadow:0 5px 0 #EFEFEF}
+.gcard.plus:hover{border-color:var(--green);background:var(--green-bg);box-shadow:0 5px 0 #C4F09A}
+.gcard.plus:active{transform:translateY(5px);box-shadow:0 0 0 #EFEFEF}
+.gcard.plus .pi{width:58px;height:58px;border-radius:18px;background:var(--green-bg);
+  color:var(--green-sh);display:grid;place-items:center;font:900 32px/1 var(--font)}
+.gcard.plus:hover .pi{background:#fff}
+.gcard.plus .pt{font-family:var(--disp);font-size:17px;color:var(--ink)}
+.gcard.plus .pd{font-size:12px;color:var(--muted);line-height:1.55;max-width:20ch}
+
+/* 「怎么加游戏」浮层内容 */
+.addbtns{display:grid;gap:10px;margin:18px 0 4px}
+.addsteps{list-style:none;padding:0;margin:18px 0 20px;counter-reset:ad}
+.addsteps li{position:relative;padding-left:31px;margin-bottom:10px;
+  font-size:12.5px;color:var(--ink2);line-height:1.6}
+.addsteps li:last-child{margin-bottom:0}
+.addsteps li::before{counter-increment:ad;content:counter(ad);position:absolute;
+  left:0;top:1px;width:21px;height:21px;border-radius:7px;background:var(--soft);
+  border:1.5px solid var(--line);color:var(--muted);display:grid;place-items:center;
+  font:800 11px/1 var(--mono)}
+.helppanel code,.addsteps code{font:700 11.5px/1.4 var(--mono);background:var(--soft);
+  border:1.5px solid var(--line);border-radius:6px;padding:2px 5px;color:var(--ink2);
+  overflow-wrap:anywhere}
+
 /* ============ 9. 游戏封面（4:3 · 小耶 + 场景） ============ */
 .cover{position:relative;aspect-ratio:4/3;overflow:hidden;background:#fff}
 .cov{position:absolute;inset:0;background-size:cover;background-position:center;
@@ -232,7 +258,7 @@ h3{font-size:19px}
   display:none;align-items:center;justify-content:center;padding:20px;
   -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .helpback.on{display:flex}
-.helppanel{background:#fff;border-radius:24px;padding:26px;max-width:430px;width:100%;
+.helppanel{background:#fff;border-radius:24px;padding:26px;max-width:468px;width:100%;
   box-shadow:0 14px 44px rgba(0,0,0,.24)}
 .helppanel h3{font-size:23px;margin:0 0 4px}
 .helppanel .chk{list-style:none;padding:0;margin:18px 0 22px;display:grid;gap:12px}
@@ -417,6 +443,26 @@ h3{font-size:19px}
 </section>
 
 <!-- ==================== 游戏清单（唯一数据源，构建时会同时导出 games.json） ==================== -->
+<!-- ==================== 「+」加一个游戏 ==================== -->
+<div class="helpback" id="addback">
+  <div class="helppanel">
+    <h3>想加一个游戏？</h3>
+    <p class="micro">不用注册本站账号，用 GitHub 就行。审核通过后，所有人的网址上都能玩到。</p>
+    <div class="addbtns">
+      <a class="btn block" id="add-fork" target="_blank" rel="noopener">去 GitHub 开始制作 ›</a>
+      <button class="btn ghost block" id="add-copy">复制清单模板</button>
+      <a class="btn ghost block" id="add-see" target="_blank" rel="noopener">看别人的游戏源码</a>
+    </div>
+    <ol class="addsteps">
+      <li>复制模板 <code>games/_template/</code><br>改名成 <code>games/你的游戏名/</code>，往里填内容</li>
+      <li>把刚复制的模板贴进 <code>src/page.html</code> 的清单里</li>
+      <li>跑一次 <code>python build/build.py</code>，本地确认能玩</li>
+      <li>提 Pull Request，我审核合并 → 网址自动更新</li>
+    </ol>
+    <button class="btn ghost block" id="add-close">知道了</button>
+  </div>
+</div>
+
 <script type="application/json" id="games-data">
 
 [
@@ -577,6 +623,7 @@ h3{font-size:19px}
   var SITE = {
     author: 'ZYZ-009',
     authorUrl: 'https://github.com/ZYZ-009',
+    repo: 'https://github.com/ZYZ-009/xiaoye-arcade',
     repoBase: 'https://github.com/ZYZ-009/xiaoye-arcade/tree/main/'
   };
 
@@ -639,9 +686,19 @@ h3{font-size:19px}
     return GAMES.filter(function (g) { return g.zone === zone; });
   }
 
+  function plusCard() {
+    return '<div class="gcard plus" role="button" tabindex="0" data-plus="1">' +
+      '<span class="pi">+</span>' +
+      '<span class="pt">加一个游戏</span>' +
+      '<span class="pd">提交到 GitHub，审核通过后所有人都能玩到</span>' +
+    '</div>';
+  }
+
   function render() {
-    document.getElementById('grid-neck').innerHTML = byZone('neck').map(cardHTML).join('');
-    document.getElementById('grid-full').innerHTML = byZone('full').map(cardHTML).join('');
+    document.getElementById('grid-neck').innerHTML =
+      byZone('neck').map(cardHTML).join('') + plusCard();
+    document.getElementById('grid-full').innerHTML =
+      byZone('full').map(cardHTML).join('') + plusCard();
     var n = document.getElementById('cnt-neck'), f = document.getElementById('cnt-full');
     if (n) n.textContent = byZone('neck').length + ' 款 · 只用头和脸';
     if (f) f.textContent = byZone('full').length + ' 款 · 需要退后两米';
@@ -719,6 +776,10 @@ h3{font-size:19px}
     if (!t.closest) return;
 
     if (t.closest('a')) return;      /* 作者 / 源码链接：让它自己跳，别打开游戏 */
+    if (t.closest('[data-plus]')) {   /* 「+」加一个游戏 */
+      document.getElementById('addback').classList.add('on');
+      return;
+    }
     var card = t.closest('.gcard');
     if (card) {
       var g = findGame(card.getAttribute('data-id'));
@@ -730,6 +791,56 @@ h3{font-size:19px}
       var el = document.getElementById(sc.getAttribute('data-scroll'));
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  });
+
+  /* ---- 「+」浮层 ---- */
+  var TEMPLATE = {
+    id: 'your-game',
+    zone: 'full',
+    name: '你的游戏名',
+    desc: '一句话说清楚这个游戏玩什么。',
+    tags: [['2 分钟', ''], ['中等', 'y'], ['全身动作', 'b']],
+    entry: 'games/your-game/index.html',
+    cover: 'games/your-game/cover.png',
+    steps: ['动作一 → 效果一', '动作二 → 效果二'],
+    author: '你的 GitHub ID',
+    repo: 'games/your-game'
+  };
+
+  function openAdd() { document.getElementById('addback').classList.add('on'); }
+  function closeAdd() { document.getElementById('addback').classList.remove('on'); }
+
+  function copyText(txt) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(txt);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = txt;
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); resolve(); } catch (e) { reject(e); }
+      document.body.removeChild(ta);
+    });
+  }
+
+  document.getElementById('add-fork').href = SITE.repo + '/fork';
+  document.getElementById('add-see').href = SITE.repo + '/tree/main/games';
+  document.getElementById('add-close').addEventListener('click', closeAdd);
+  document.getElementById('addback').addEventListener('click', function (e) {
+    if (e.target === this) closeAdd();
+  });
+  document.getElementById('add-copy').addEventListener('click', function () {
+    var btn = this;
+    copyText(JSON.stringify(TEMPLATE, null, 2)).then(function () {
+      btn.textContent = '✅ 已复制，去粘贴吧';
+      setTimeout(function () { btn.textContent = '复制清单模板'; }, 3000);
+    }).catch(function () {
+      btn.textContent = '复制失败，请手动复制';
+      setTimeout(function () { btn.textContent = '复制清单模板'; }, 3000);
+    });
   });
 
   document.getElementById('btn-back').addEventListener('click', closeGame);
@@ -744,6 +855,7 @@ h3{font-size:19px}
     if (e.key === 'Escape') {
       var hb = document.getElementById('helpback');
       if (hb.classList.contains('on')) hb.classList.remove('on');
+      closeAdd();
     }
   });
 
