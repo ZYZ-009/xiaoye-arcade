@@ -4,6 +4,12 @@
 
 分成「坐着玩」和「站着玩」两个区，**全部开源**。
 
+### 🔗 在线试玩
+
+**<https://zyz-009.github.io/xiaoye-arcade/>**
+
+体感功能要求 **https**，这个地址就是 https 的 —— **手机也能直接用**。
+
 ![大厅](docs/screenshot-lobby.png)
 
 ---
