@@ -584,6 +584,7 @@ h3{font-size:19px}
       </div>
       <button class="sw" id="rw-notify" role="switch" aria-checked="false" aria-label="系统通知"></button>
     </div>
+    <button class="btn ghost block" id="rw-nretry" style="display:none;margin-top:10px">我已改好，重新检查 ›</button>
 
     <div class="rwnote">
       <b>下一场：</b><span class="nx" id="rw-next">未开启</span><br>
@@ -592,6 +593,7 @@ h3{font-size:19px}
     </div>
 
     <button class="btn block" id="rw-now" style="margin-top:16px">现在就来一局 90 秒</button>
+    <button class="btn ghost block" id="rw-test" style="margin-top:9px">🔔 测试提醒（立刻弹一次）</button>
     <button class="btn ghost block" id="rw-close" style="margin-top:9px">知道了</button>
   </div>
 </div>
@@ -1091,6 +1093,31 @@ h3{font-size:19px}
     if (document.activeElement !== el('rw-min')) el('rw-min').value = REM.min;
   }
 
+  /* ---- 系统通知的状态提示 ---- */
+  function nTip(extra) {
+    var tip = el('rw-ntip'), re = el('rw-nretry');
+    if (!re) return;
+    if (!('Notification' in window)) {
+      tip.textContent = '这个浏览器不支持系统通知 —— 页面内的提醒照常工作。';
+      re.style.display = 'none';
+      return;
+    }
+    var p = Notification.permission;
+    if (p === 'granted') {
+      tip.innerHTML = '已开启 —— 页面切到后台也能弹出来。';
+      re.style.display = 'none';
+    } else if (p === 'denied') {
+      tip.innerHTML = extra
+        ? extra
+        : '浏览器把通知拦了。点<b>地址栏最左边的图标</b> → 通知 → 改成「允许」，' +
+          '改完按 <b>F5 刷新</b>本页，再回来点下面的按钮。';
+      re.style.display = 'block';
+    } else {
+      tip.textContent = '页面在后台时也能弹到桌面上（第一次会问你要权限）';
+      re.style.display = 'none';
+    }
+  }
+
   function remArm() { REM.on = true; remSchedule(Date.now()); remSave(); remPaint(); }
   function remDisarm() { REM.on = false; REM.next = 0; remSave(); remPaint(); }
 
@@ -1108,10 +1135,13 @@ h3{font-size:19px}
   }
 
   /* ---- 到点提醒 ---- */
+  var BASE_TITLE = document.title;
   function remFire() {
     REM.count++;
     remSchedule(Date.now()); remSave();
     var tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    /* 页面在后台时改标题 —— 这是唯一不依赖通知权限的提示方式 */
+    if (document.hidden) document.title = '🔔 该活动一下啦！';
     el('pop-title').textContent = (REM.count % 3 === 0) ? '起来动一下吧！' : '该活动一下啦！';
     el('pop-sub').textContent = tip + ' 一局只要 90 秒。';
     el('remindpop').classList.add('on');
@@ -1141,7 +1171,7 @@ h3{font-size:19px}
   }
 
   /* ---- 面板 ---- */
-  function openRemind() { remPaint(); el('remindback').classList.add('on'); }
+  function openRemind() { remPaint(); nTip(); el('remindback').classList.add('on'); }
   function closeRemind() { el('remindback').classList.remove('on'); }
 
   /* ---- 建 chips ---- */
@@ -1165,25 +1195,36 @@ h3{font-size:19px}
   el('rw-on').addEventListener('click', function () { REM.on ? remDisarm() : remArm(); });
   el('rw-close').addEventListener('click', closeRemind);
   el('remindback').addEventListener('click', function (e) { if (e.target === this) closeRemind(); });
-  el('rw-min').addEventListener('change', function () {
-    var v = parseInt(this.value, 10);
+  function applyMin(commit) {
+    var box = el('rw-min');
+    var v = parseInt(box.value, 10);
     if (isNaN(v) || v < 1) v = 1;
     if (v > 240) v = 240;
-    REM.min = v; this.value = v;
+    REM.min = v;
+    if (commit) box.value = v;               /* 失焦 / 回车时才纠正显示，免得打字被打断 */
     if (REM.on) remSchedule(Date.now());
     remSave(); remPaint();
-  });
+  }
+  el('rw-min').addEventListener('input', function () { applyMin(false); });   /* 边打边生效 */
+  el('rw-min').addEventListener('change', function () { applyMin(true); });
+  el('rw-min').addEventListener('blur', function () { applyMin(true); });
   el('rw-notify').addEventListener('click', function () {
-    var tip = el('rw-ntip');
-    if (REM.notify) { REM.notify = false; remSave(); remPaint(); return; }
-    if (!('Notification' in window)) {
-      tip.textContent = '这个浏览器不支持系统通知 —— 页面内的提醒照常工作。';
-      return;
-    }
+    if (REM.notify) { REM.notify = false; remSave(); remPaint(); nTip(); return; }
+    if (!('Notification' in window)) { nTip(); return; }
+    if (Notification.permission === 'denied') { nTip(); return; }   /* 已被拦，只能去设置里改 */
     Notification.requestPermission().then(function (p) {
       if (p === 'granted') { REM.notify = true; remSave(); remPaint(); }
-      else { tip.textContent = '你没允许通知。想开的话，点地址栏左边的图标改一下。'; }
+      nTip();
     });
+  });
+
+  el('rw-nretry').addEventListener('click', function () {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      REM.notify = true; remSave(); remPaint(); nTip();
+    } else {
+      nTip('还是「已阻止」。确认改完「允许」之后，按 <b>F5 刷新</b>本页再点这里。');
+    }
   });
   el('pop-play').addEventListener('click', playNow);
   el('pop-snooze').addEventListener('click', function () { remSnooze(5); });
@@ -1281,6 +1322,18 @@ h3{font-size:19px}
     }).observe(gs, { attributes: true, attributeFilter: ['class'] });
   })();
 
+  /* ---- 回到页面时把标题复原 ---- */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) document.title = BASE_TITLE;
+  });
+
+  /* ---- 测试按钮：立刻弹一次，不用等 ---- */
+  el('rw-test').addEventListener('click', function () {
+    closeRemind();
+    try { window.focus(); } catch (e) {}
+    remFire();
+  });
+
   /* ---- Esc 关面板 ---- */
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
@@ -1292,6 +1345,7 @@ h3{font-size:19px}
 
   /* ---- 启动 ---- */
   remLoad();
+  nTip();
   el('pet').classList.add('on');
   if (REM.on) {
     /* 关了很久再打开：重新排一场，别立刻炸出来 */
