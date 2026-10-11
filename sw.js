@@ -3,7 +3,7 @@
    ① 让网站能"装"到桌面（PWA 的前提）
    ② 断网时还能打开首页（游戏本身需要联网，不缓存）           */
 
-var CACHE = 'xiaoye-v1';
+var CACHE = 'xiaoye-v2';
 var SHELL = [
   './',
   './manifest.webmanifest',
