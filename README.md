@@ -6,9 +6,11 @@
 
 ### 🔗 在线试玩
 
-**<https://zyz-009.github.io/xiaoye-arcade/>**
+**<https://tubular-sundae-6a9ebf.netlify.app>**
 
 体感功能要求 **https**，这个地址就是 https 的 —— **手机也能直接用**。
+
+<sub>备用（部分地区需要代理）：<https://zyz-009.github.io/xiaoye-arcade/></sub>
 
 ![大厅](docs/screenshot-lobby.png)
 
@@ -30,6 +32,34 @@
 | --- | --- | --- |
 | 骑士远征 | 无尽跑酷 | 原地跳、蹲下、空中拍手 |
 | 像素CSGO | 方块战场射击 | 身体倾斜走位、手枪手势开火 |
+
+---
+
+## ⏰ 小耶提醒（桌面搭子）
+
+页面右下角常驻一只**小耶**，点它可以设定**到点提醒你活动一下**。
+
+| 功能 | 说明 |
+| --- | --- |
+| 🐣 **常驻浮标** | 可拖动，位置会记住；进游戏时自动隐藏 |
+| ⏱ **自定义间隔** | 5 / 10 / 15 / 20 / 30 / 60 分钟，或自己填 |
+| 🔔 **到点弹窗** | 小耶跳到屏幕中间举牌，一键「去玩 90 秒」 |
+| 💻 **系统通知** | 可选，页面切到后台也能弹出来（需授权） |
+| 💾 **自动记住** | 设置存在本机，下次打开还在 |
+
+**计时用的是「绝对时刻」而不是「倒计时」** —— 页面被冻结再唤醒，时间会自动对上，
+既不会漏提醒，也不会一次弹一串。
+
+### 装成 App（PWA）
+
+浏览器菜单里选 **「安装」** 或 **「添加到主屏幕」**：
+
+- 桌面出现小耶图标，双击直接开
+- 独立窗口，不占浏览器标签页
+- **电脑上最小化也会照样提醒**
+- 断网也能打开首页（游戏本身还是要联网）
+
+> **手机上**：锁屏后提醒会暂停（浏览器的限制）。想要更稳，用电脑开着。
 
 ---
 
@@ -59,15 +89,18 @@ python -m http.server 8123
 
 ```
 .
-├─ index.html          ← 网站入口（构建产物，别直接改）
-├─ games.json          ← 游戏清单（构建时自动导出，别直接改）
-├─ games/              ← 所有游戏，一个游戏一个文件夹
-│   ├─ _template/      ← 新游戏模板，加游戏就复制它
+├─ index.html            ← 网站入口（构建产物，别直接改）
+├─ games.json            ← 游戏清单（构建时自动导出，别直接改）
+├─ sw.js                 ← Service Worker（PWA 用）
+├─ manifest.webmanifest  ← PWA 清单（名字、图标、独立窗口）
+├─ games/                ← 所有游戏，一个游戏一个文件夹
+│   ├─ _template/        ← 新游戏模板，加游戏就复制它
 │   ├─ bumper/  nose/  drift/  knight/  voxel/
-├─ src/page.html       ← 大厅源文件（改这个）
-├─ build/build.py      ← 构建脚本
-├─ assets/             ← 封面、角色素材
-└─ docs/               ← 截图
+├─ src/page.html         ← 大厅源文件（改这个）
+├─ build/build.py        ← 构建：内联图片 → index.html
+├─ build/deploy.py       ← 打包：生成 deploy/ 和 deploy.zip
+├─ assets/               ← 封面、角色素材、PWA 图标
+└─ docs/                 ← 截图
 ```
 
 **大厅的源文件是 `src/page.html`，不是 `index.html`。**
@@ -76,7 +109,8 @@ python -m http.server 8123
 改完源文件重新构建：
 
 ```bash
-python build/build.py
+python build/build.py     # 内联图片，生成 index.html
+python build/deploy.py    # 打部署包，生成 deploy/ 和 deploy.zip
 ```
 
 ---
@@ -99,6 +133,8 @@ python build/build.py
 - 大厅：原生 HTML / CSS / JS，单文件
 - 游戏：各自独立，通过 `iframe` 加载
 - 体感：MediaPipe（FaceMesh / Pose / Hands）+ Three.js，走 CDN
+- 提醒：绝对时刻计时 + Notification API + localStorage
+- 可安装：PWA（manifest + Service Worker），无需后端
 
 ---
 

@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="小耶乐园">
+<meta name="description" content="打开就能玩的体感小游戏合集 · 每 90 秒动一下，对抗久坐">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title>小耶体感乐园 · 打开就能玩</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -284,6 +292,79 @@ h3{font-size:19px}
   .play-stage{width:calc(100% - 32px)}
 }
 
+/* ============ 12. 小耶提醒（桌面搭子） ============ */
+/* --- 浮标小耶 --- */
+#pet{position:fixed;z-index:180;left:auto;right:14px;bottom:14px;display:none;
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#pet.on{display:block}
+#pet.hide{display:none}
+#pet .pgrab{position:relative;cursor:grab;padding:10px 8px 6px;touch-action:none}
+#pet .pgrab:active{cursor:grabbing}
+#pet .xy{--xy-w:98px;transition:transform .18s ease}
+#pet .pgrab:hover .xy{transform:translateY(-4px) scale(1.04)}
+#pet .pcnt{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% - 6px);
+  white-space:nowrap;background:#fff;border:2px solid var(--line);border-radius:999px;
+  padding:5px 13px;font:800 12px/1 var(--mono);color:var(--green-sh);
+  box-shadow:0 3px 0 var(--line);pointer-events:none}
+#pet .pcnt.off{color:var(--ink2);border-style:dashed;box-shadow:none;background:#fff}
+#pet .pdot{position:absolute;right:12px;top:10px;width:13px;height:13px;border-radius:50%;
+  background:var(--muted);border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.22)}
+#pet.armed .pdot{background:var(--green);animation:pdot 1.8s ease-in-out infinite}
+@keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.7}}
+
+/* --- 到点弹窗 --- */
+#remindpop{position:fixed;inset:0;z-index:210;display:none;align-items:center;
+  justify-content:center;padding:20px;background:rgba(27,16,48,.5);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+#remindpop.on{display:flex}
+.rpcard{background:#fff;border-radius:28px;padding:24px 24px 20px;max-width:390px;width:100%;
+  text-align:center;box-shadow:0 18px 52px rgba(0,0,0,.3);
+  animation:rpIn .34s cubic-bezier(.2,1.35,.5,1)}
+@keyframes rpIn{from{transform:scale(.8) translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.rpcard .xy{--xy-w:126px;margin:0 auto 4px}
+.rpcard h3{font-size:25px;margin:8px 0 7px}
+.rpcard .rpsub{font-size:13.5px;color:var(--ink2);line-height:1.62;margin:0 0 18px}
+.rpcard .rpbtns{display:grid;gap:9px}
+
+/* --- 设置面板 --- */
+.rwrow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 0;border-top:2px solid var(--line)}
+.rwrow.first{border-top:0;padding-top:4px}
+.rwrow.block{display:block}
+.rwrow .rwl{font-size:14.5px;font-weight:800}
+.rwrow .rwd{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+.sw{flex:none;width:54px;height:31px;border-radius:999px;background:var(--line);
+  border:0;padding:0;position:relative;cursor:pointer;transition:background .2s}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:25px;height:25px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .2s}
+.sw[aria-checked="true"]{background:var(--green)}
+.sw[aria-checked="true"]::after{transform:translateX(23px)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.chips button{font:800 13px/1 var(--font);color:var(--ink);background:#fff;
+  border:2px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;
+  box-shadow:0 3px 0 var(--line);transition:transform .1s}
+.chips button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+.chips button.on{background:var(--green-bg);border-color:var(--green);color:var(--green-sh);
+  box-shadow:0 3px 0 var(--green)}
+.rwcustom{display:flex;align-items:center;gap:9px;margin-top:11px;font-size:13px;color:var(--ink2)}
+.rwcustom input{width:76px;font:800 14px/1 var(--mono);text-align:center;padding:9px 6px;
+  border:2px solid var(--line);border-radius:12px;color:var(--ink);background:#fff}
+.rwcustom input:focus{outline:0;border-color:var(--green)}
+.rwnote{font-size:12px;color:var(--muted);line-height:1.65;background:var(--soft);
+  border-radius:14px;padding:12px 14px;margin-top:16px}
+.rwnote b{color:var(--ink2)}
+.rwnote .nx{color:var(--green-sh);font-weight:800;font-family:var(--mono)}
+
+@media(max-width:760px){
+  #pet .xy{--xy-w:72px}
+  #pet .pcnt{font-size:11px;padding:4px 10px}
+  #pet .pdot{width:11px;height:11px;right:9px;top:8px}
+  .rpcard .xy{--xy-w:104px}
+  .rpcard{padding:20px 18px 16px}
+  .rpcard h3{font-size:21px}
+  .helppanel{max-height:88vh;overflow:auto;-webkit-overflow-scrolling:touch}
+}
+
 </style>
 </head>
 <body>
@@ -460,6 +541,71 @@ h3{font-size:19px}
       <li>提 Pull Request，我审核合并 → 网址自动更新</li>
     </ol>
     <button class="btn ghost block" id="add-close">知道了</button>
+  </div>
+</div>
+
+<!-- ==================== 小耶提醒 · 浮标 ==================== -->
+<div id="pet">
+  <div class="pgrab" id="pet-grab" title="小耶提醒 · 点我设置">
+    <span class="pdot"></span>
+    <div class="pcnt off" id="pet-cnt">点我开提醒</div>
+    <div class="xy blink" id="pet-xy"><i class="lid l1"></i><i class="lid l2"></i></div>
+  </div>
+</div>
+
+<!-- ==================== 小耶提醒 · 设置 ==================== -->
+<div class="helpback" id="remindback">
+  <div class="helppanel">
+    <h3>小耶提醒</h3>
+    <p class="micro">到点了，小耶会跳出来提醒你活动一下。</p>
+
+    <div class="rwrow first">
+      <div>
+        <div class="rwl">开启提醒</div>
+        <div class="rwd">关掉后小耶就安静待着，不再打扰你</div>
+      </div>
+      <button class="sw" id="rw-on" role="switch" aria-checked="false" aria-label="开启提醒"></button>
+    </div>
+
+    <div class="rwrow block">
+      <div class="rwl">多久提醒一次</div>
+      <div class="chips" id="rw-chips"></div>
+      <div class="rwcustom">
+        <span>自定义</span>
+        <input id="rw-min" type="number" min="1" max="240" step="1" value="10" inputmode="numeric">
+        <span>分钟</span>
+      </div>
+    </div>
+
+    <div class="rwrow">
+      <div>
+        <div class="rwl">同时发系统通知</div>
+        <div class="rwd" id="rw-ntip">页面在后台时也能弹到桌面上（第一次会问你要权限）</div>
+      </div>
+      <button class="sw" id="rw-notify" role="switch" aria-checked="false" aria-label="系统通知"></button>
+    </div>
+
+    <div class="rwnote">
+      <b>下一场：</b><span class="nx" id="rw-next">未开启</span><br>
+      <b>电脑上：</b>页面最小化也会照样提醒。<br>
+      <b>手机上：</b>建议「添加到主屏幕」，并把页面留在后台 —— 锁屏后提醒会暂停。
+    </div>
+
+    <button class="btn block" id="rw-now" style="margin-top:16px">现在就来一局 90 秒</button>
+    <button class="btn ghost block" id="rw-close" style="margin-top:9px">知道了</button>
+  </div>
+</div>
+
+<!-- ==================== 小耶提醒 · 到点弹窗 ==================== -->
+<div id="remindpop">
+  <div class="rpcard">
+    <div class="xy cheer" id="pop-xy"><i class="lid l1"></i><i class="lid l2"></i></div>
+    <h3 id="pop-title">该活动一下啦！</h3>
+    <p class="rpsub" id="pop-sub">你已经坐了很久，起来动 90 秒吧。</p>
+    <div class="rpbtns">
+      <button class="btn block" id="pop-play">去玩 90 秒 ›</button>
+      <button class="btn ghost block" id="pop-snooze">再等 5 分钟</button>
+    </div>
   </div>
 </div>
 
@@ -883,6 +1029,283 @@ h3{font-size:19px}
         }
       })
       .catch(function () { /* 没有这个文件也没关系，用内置清单 */ });
+  }
+
+
+  /* ==================== 小耶提醒 · 桌面搭子 ==================== */
+  var REM_KEY = 'xy_remind_v1';
+  var POS_KEY = 'xy_pet_pos_v1';
+  var PRESETS = [5, 10, 15, 20, 30, 60];
+  var REM = { on: false, min: 10, next: 0, notify: false, count: 0 };
+
+  var TIPS = [
+    '抬头看看远处，眼睛也顺便休息 20 秒。',
+    '慢慢转一转脖子，左右各 5 次，别用力。',
+    '站起来伸个懒腰 —— 比刷一条视频值。',
+    '耸一耸肩、绕一绕，僵了半天了。',
+    '喝口水，顺便走两步。'
+  ];
+
+  function el(id) { return document.getElementById(id); }
+
+  /* ---- 存 / 取 ---- */
+  function remLoad() {
+    try {
+      var o = JSON.parse(localStorage.getItem(REM_KEY) || 'null');
+      if (!o) return;
+      REM.on = !!o.on;
+      REM.min = Math.min(240, Math.max(1, parseInt(o.min, 10) || 10));
+      REM.next = parseInt(o.next, 10) || 0;
+      REM.notify = !!o.notify;
+      REM.count = parseInt(o.count, 10) || 0;
+    } catch (e) {}
+  }
+  function remSave() {
+    try { localStorage.setItem(REM_KEY, JSON.stringify(REM)); } catch (e) {}
+  }
+  function mmss(ms) {
+    var t = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2);
+  }
+  function remSchedule(from) { REM.next = from + REM.min * 60000; }
+
+  /* ---- 界面同步 ---- */
+  function remPaint() {
+    var cnt = el('pet-cnt'), nx = el('rw-next');
+    el('pet').classList.toggle('armed', REM.on);
+    el('rw-on').setAttribute('aria-checked', REM.on ? 'true' : 'false');
+    el('rw-notify').setAttribute('aria-checked', REM.notify ? 'true' : 'false');
+    if (REM.on) {
+      cnt.classList.remove('off');
+      if (REM.next > Date.now()) cnt.textContent = '还有 ' + mmss(REM.next - Date.now());
+      nx.textContent = '还有 ' + mmss(REM.next - Date.now());
+    } else {
+      cnt.classList.add('off');
+      cnt.textContent = '点我开提醒';
+      nx.textContent = '未开启';
+    }
+    var cs = el('rw-chips').children;
+    for (var i = 0; i < cs.length; i++) {
+      cs[i].classList.toggle('on', parseInt(cs[i].getAttribute('data-min'), 10) === REM.min);
+    }
+    if (document.activeElement !== el('rw-min')) el('rw-min').value = REM.min;
+  }
+
+  function remArm() { REM.on = true; remSchedule(Date.now()); remSave(); remPaint(); }
+  function remDisarm() { REM.on = false; REM.next = 0; remSave(); remPaint(); }
+
+  /* ---- 系统通知 ---- */
+  function remNotify(title, body) {
+    if (!REM.notify) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      var n = new Notification('小耶 · ' + title, {
+        body: body, icon: 'assets/icon-192.png', badge: 'assets/icon-192.png',
+        tag: 'xy-remind', renotify: true
+      });
+      n.onclick = function () { try { window.focus(); } catch (e) {} n.close(); };
+    } catch (e) {}
+  }
+
+  /* ---- 到点提醒 ---- */
+  function remFire() {
+    REM.count++;
+    remSchedule(Date.now()); remSave();
+    var tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    el('pop-title').textContent = (REM.count % 3 === 0) ? '起来动一下吧！' : '该活动一下啦！';
+    el('pop-sub').textContent = tip + ' 一局只要 90 秒。';
+    el('remindpop').classList.add('on');
+    el('pop-xy').classList.add('cheer');
+    remPaint();
+    remNotify('该活动一下啦！', tip);
+  }
+  function remSnooze(mins) {
+    el('remindpop').classList.remove('on');
+    el('pop-xy').classList.remove('cheer');
+    REM.next = Date.now() + (mins || 5) * 60000;
+    remSave(); remPaint();
+  }
+
+  /* ---- 挑一个脖颈区游戏（不用站起来） ---- */
+  function pickNeck() {
+    var list = [];
+    for (var i = 0; i < GAMES.length; i++) if (GAMES[i].zone === 'neck') list.push(GAMES[i]);
+    if (!list.length) list = GAMES;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  function playNow() {
+    el('remindpop').classList.remove('on');
+    el('pop-xy').classList.remove('cheer');
+    var g = pickNeck();
+    if (g) openGame(g);
+  }
+
+  /* ---- 面板 ---- */
+  function openRemind() { remPaint(); el('remindback').classList.add('on'); }
+  function closeRemind() { el('remindback').classList.remove('on'); }
+
+  /* ---- 建 chips ---- */
+  (function () {
+    var box = el('rw-chips');
+    PRESETS.forEach(function (m) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = m + ' 分';
+      b.setAttribute('data-min', m);
+      b.addEventListener('click', function () {
+        REM.min = m;
+        if (REM.on) remSchedule(Date.now());
+        remSave(); remPaint();
+      });
+      box.appendChild(b);
+    });
+  })();
+
+  /* ---- 事件接线 ---- */
+  el('rw-on').addEventListener('click', function () { REM.on ? remDisarm() : remArm(); });
+  el('rw-close').addEventListener('click', closeRemind);
+  el('remindback').addEventListener('click', function (e) { if (e.target === this) closeRemind(); });
+  el('rw-min').addEventListener('change', function () {
+    var v = parseInt(this.value, 10);
+    if (isNaN(v) || v < 1) v = 1;
+    if (v > 240) v = 240;
+    REM.min = v; this.value = v;
+    if (REM.on) remSchedule(Date.now());
+    remSave(); remPaint();
+  });
+  el('rw-notify').addEventListener('click', function () {
+    var tip = el('rw-ntip');
+    if (REM.notify) { REM.notify = false; remSave(); remPaint(); return; }
+    if (!('Notification' in window)) {
+      tip.textContent = '这个浏览器不支持系统通知 —— 页面内的提醒照常工作。';
+      return;
+    }
+    Notification.requestPermission().then(function (p) {
+      if (p === 'granted') { REM.notify = true; remSave(); remPaint(); }
+      else { tip.textContent = '你没允许通知。想开的话，点地址栏左边的图标改一下。'; }
+    });
+  });
+  el('pop-play').addEventListener('click', playNow);
+  el('pop-snooze').addEventListener('click', function () { remSnooze(5); });
+  el('rw-now').addEventListener('click', function () { closeRemind(); playNow(); });
+
+  /* ---- 每秒检查一次（存的是「到点时刻」，不是「还剩多久」）---- */
+  setInterval(function () {
+    if (!REM.on) return;
+    var left = REM.next - Date.now();
+    if (left <= 0) {
+      /* 离开太久（超过 2 个周期）就重新排，不补发一串 */
+      if (left < -REM.min * 60000 * 2) { remSchedule(Date.now()); remSave(); remPaint(); return; }
+      if (el('remindpop').classList.contains('on')) { remSchedule(Date.now()); remPaint(); return; }
+      remFire();
+      return;
+    }
+    var cnt = el('pet-cnt');
+    if (!cnt.classList.contains('off')) cnt.textContent = '还有 ' + mmss(left);
+    if (el('remindback').classList.contains('on')) el('rw-next').textContent = '还有 ' + mmss(left);
+  }, 1000);
+
+  /* ---- 浮标拖动 + 点击 ---- */
+  (function () {
+    var pet = el('pet'), grab = el('pet-grab');
+    var dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+
+    function place(x, y) {
+      var w = pet.offsetWidth || 120, h = pet.offsetHeight || 140;
+      x = Math.max(4, Math.min(window.innerWidth - w - 4, x));
+      y = Math.max(4, Math.min(window.innerHeight - h - 4, y));
+      pet.style.left = x + 'px';
+      pet.style.top = y + 'px';
+      pet.style.right = 'auto';
+      pet.style.bottom = 'auto';
+      return [x, y];
+    }
+    function restore() {
+      var x = null, y = null;
+      try {
+        var p = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+        if (p && p.length === 2) { x = p[0]; y = p[1]; }
+      } catch (e) {}
+      if (x === null) {
+        var w = pet.offsetWidth || 120, h = pet.offsetHeight || 140;
+        x = window.innerWidth - w - 14;
+        y = window.innerHeight - h - 14;
+      }
+      var r = place(x, y);
+      try { localStorage.setItem(POS_KEY, JSON.stringify(r)); } catch (e) {}
+    }
+    function pt(e) { return e.touches && e.touches[0] ? e.touches[0] : e; }
+    function down(e) {
+      var p = pt(e);
+      dragging = true; moved = false;
+      sx = p.clientX; sy = p.clientY;
+      var r = pet.getBoundingClientRect();
+      ox = r.left; oy = r.top;
+    }
+    function move(e) {
+      if (!dragging) return;
+      var p = pt(e);
+      var dx = p.clientX - sx, dy = p.clientY - sy;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
+      if (moved) { place(ox + dx, oy + dy); if (e.cancelable) e.preventDefault(); }
+    }
+    function up() {
+      if (!dragging) return;
+      dragging = false;
+      var r = pet.getBoundingClientRect();
+      var q = place(r.left, r.top);
+      try { localStorage.setItem(POS_KEY, JSON.stringify(q)); } catch (e) {}
+      if (!moved) openRemind();
+    }
+    grab.addEventListener('mousedown', down);
+    grab.addEventListener('touchstart', down, { passive: true });
+    window.addEventListener('mousemove', move);
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchend', up);
+    window.addEventListener('resize', function () {
+      var r = pet.getBoundingClientRect();
+      place(r.left, r.top);
+    });
+    restore();
+  })();
+
+  /* ---- 进游戏时把浮标藏起来，别挡住画面 ---- */
+  (function () {
+    var gs = el('s-game');
+    if (!gs || !window.MutationObserver) return;
+    new MutationObserver(function () {
+      var inGame = gs.classList.contains('active');
+      el('pet').classList.toggle('hide', inGame);
+      if (inGame) closeRemind();
+    }).observe(gs, { attributes: true, attributeFilter: ['class'] });
+  })();
+
+  /* ---- Esc 关面板 ---- */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeRemind();
+      el('remindpop').classList.remove('on');
+      el('pop-xy').classList.remove('cheer');
+    }
+  });
+
+  /* ---- 启动 ---- */
+  remLoad();
+  el('pet').classList.add('on');
+  if (REM.on) {
+    /* 关了很久再打开：重新排一场，别立刻炸出来 */
+    if (!REM.next || REM.next < Date.now() - REM.min * 60000 * 2) remSchedule(Date.now());
+    remSave();
+  }
+  remPaint();
+
+  /* ---- 注册 Service Worker（PWA）---- */
+  var localHost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || localHost)) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
   }
 
   window.__games = GAMES;
