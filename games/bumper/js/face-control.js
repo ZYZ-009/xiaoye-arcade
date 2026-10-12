@@ -138,7 +138,7 @@ const FaceControl = (() => {
   // ---------- 摄像头 / 模型 ----------
   function createFaceMesh() {
     const F = window.FaceMesh;
-    const inst = new F({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}` });
+    const inst = new F({ locateFile: f => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}` });
     inst.setOptions({ maxNumFaces: 1, refineLandmarks: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     inst.onResults(r => { lastFace = r; });
     return inst;

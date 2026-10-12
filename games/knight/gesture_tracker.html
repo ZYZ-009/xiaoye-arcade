@@ -93,8 +93,8 @@ canvas { z-index:3; }
 <script>(function(){if(window.location.protocol!=="file:"){document.addEventListener("DOMContentLoaded",()=>{const h=document.getElementById("hintArea");if(h)h.style.display="none";});}})();</script>
 
 <!-- ========== 双模型CDN：Pose(手臂骨架) + Hands(手指细节) ========== -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+<script src="https://fastly.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js" crossorigin="anonymous"></script>
+<script src="https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
 
 <script>
 const Hands = window.Hands;
@@ -168,7 +168,7 @@ function drawPoint(cx,cy,r,fill,stroke) {
 
 /* ==================== 创建实例 ==================== */
 function createHandsInstance() {
-  const h = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`});
+  const h = new Hands({locateFile:f=>`https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}`});
   h.setOptions({
     maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5
   });
@@ -176,7 +176,7 @@ function createHandsInstance() {
   return h;
 }
 function createPoseInstance() {
-  const p = new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+  const p = new Pose({locateFile:f=>`https://fastly.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
   p.setOptions({
     modelComplexity:1, smoothLandmarks:true, enableSegmentation:false,
     minDetectionConfidence:0.5, minTrackingConfidence:0.5

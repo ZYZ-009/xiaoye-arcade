@@ -197,13 +197,13 @@ const Motion = (() => {
   // MediaPipe 实例（与 gesture_tracker.html 相同的双模型）
   // ============================================================
   function createHandsInstance() {
-    const h = new window.Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}` });
+    const h = new window.Hands({ locateFile: f => `https://fastly.jsdelivr.net/npm/@mediapipe/hands@0.4/${f}` });
     h.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     h.onResults(r => { lastHands = r; });
     return h;
   }
   function createPoseInstance() {
-    const p = new window.Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
+    const p = new window.Pose({ locateFile: f => `https://fastly.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
     p.setOptions({ modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false,
       minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     p.onResults(r => { lastPose = r; });

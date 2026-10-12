@@ -226,7 +226,7 @@ select { background:#11131c; color:#e6edf3; border:1px solid #2a2444;
 </div>
 
 <!-- MediaPipe FaceMesh（468 点人脸网格，鼻尖精度远高于全身姿态） -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
 
 <script>
 /* ============================================================
@@ -337,7 +337,7 @@ select { background:#11131c; color:#e6edf3; border:1px solid #2a2444;
   // ---------- MediaPipe ----------
   function createFaceMesh() {
     const fm = new window.FaceMesh({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
+      locateFile: f => `https://fastly.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
     });
     fm.setOptions({
       maxNumFaces: 1,

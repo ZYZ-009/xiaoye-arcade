@@ -141,7 +141,7 @@
   <button id="endBtn">下一局（新地图）</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 if (!window.THREE) { document.body.innerHTML = '<p style="color:#fff;padding:40px">需要联网加载 Three.js，请检查网络后刷新。</p>'; throw new Error('no three'); }
 
@@ -470,9 +470,9 @@ async function initBodyTracking(){
     await camVideo.play();
     status.textContent = '加载姿态识别模型（首次约 5-10 秒）...';
     // 显式加载 ESM bundle（裸包名可能解析到 CJS 导致失败）
-    const mod = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const mod = await import('https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
     const vision = mod.FilesetResolver ? mod : (mod.default || mod);
-    const fileset = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const fileset = await vision.FilesetResolver.forVisionTasks('https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
     const opts = delegate => ({
       baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task', delegate },
       runningMode: 'VIDEO', numPoses: 1,

@@ -1097,7 +1097,7 @@ const FaceControl = (function () {
   const latch = { up: false, down: false, left: false, right: false };
   let lastSeen = 0, lastDetectOk = false, loopStartedAt = 0;
 
-  const CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const CDN = 'https://fastly.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
   const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
   function setStatus(text, color) {
